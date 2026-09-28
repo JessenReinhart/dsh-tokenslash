@@ -37,6 +37,7 @@ export default function SettingsCard({
     },
   });
 
+  const [loading, setLoading] = React.useState(!externalConfig);
   const [internalStats, setInternalStats] = React.useState(null);
   const [availableModels, setAvailableModels] = React.useState([]);
   const [providers, setProviders] = React.useState([]);
@@ -85,7 +86,7 @@ export default function SettingsCard({
         }
       }
     }
-    loadData();
+    loadData().finally(() => setLoading(false));
   }, [externalConfig, externalStats, onFetchModels]);
 
   async function handleTest() {
@@ -126,6 +127,20 @@ export default function SettingsCard({
       setSaving(false);
       setTimeout(() => setSaveMessage(""), 4000);
     }
+  }
+
+  if (loading && !externalConfig) {
+    return (
+      <div className="ts-card">
+        <div className="ts-card-header">
+          TokenSlash System One Token Optimization
+        </div>
+        <div className="ts-loading">
+          <div className="ts-spinner" />
+          <span>Loading settings...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
