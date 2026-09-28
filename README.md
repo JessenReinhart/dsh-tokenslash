@@ -17,9 +17,24 @@ TokenSlash optimization suite for DeepSeek Harness (DSH). Routes subagents to ch
 
 Requires Node.js `>=20`, ESM (`"type": "module"`).
 
+### Via DSH Plugin Manager (Recommended)
+
 ```bash
-npm install dsh-tokenslash
-# or drop into DSH packages dir and restart host
+dsh plugin add github:JessenReinhart/dsh-tokenslash
+```
+
+### Via npm (GitHub)
+
+```bash
+npm install github:JessenReinhart/dsh-tokenslash
+```
+
+### Manual (Clone)
+
+Clone directly into DSH profile `packages` directory:
+
+```bash
+git clone https://github.com/JessenReinhart/dsh-tokenslash.git ~/.dsh/profiles/desktop/packages/dsh-tokenslash
 ```
 
 Plugin mounts via `cordis.patch.yml` (`id: tokenslash`). Host entry `lib/index.js` exports `apply`/`inject`; browser entry `lib/client.js` re-exports web slots.

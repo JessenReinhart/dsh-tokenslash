@@ -33,5 +33,9 @@
     "package.json",
     "README.md"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JessenReinhart/dsh-tokenslash.git"
+  }
 }
