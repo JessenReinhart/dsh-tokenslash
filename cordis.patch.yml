@@ -1,0 +1,5 @@
+# dsh-tokenslash permanent bundle patch
+# Mounts the TokenSlash TypeSafe Jev optimization suite into DSH root composition
+- insert:
+    - id: tokenslash
+      name: 'dsh-tokenslash'
