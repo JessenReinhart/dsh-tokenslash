@@ -134,10 +134,65 @@ test("promptPruneHook keeps relevant tools when prompt requires them", async () 
   assert.ok(sectionNames.includes("free-search"));
 });
 
-test("promptPruneHook extreme mode prunes ALL tools", async () => {
+test("promptPruneHook extreme mode applies intent-based pruning without core tool fallback", async () => {
   const telemetry = new TokenslashTelemetry();
   const config = { enabled: true, toolPruningMode: "extreme", modules: { promptPruning: true } };
   const hook = createPromptPruneHook({}, {}, () => config, telemetry);
+
+  // Coding/refactoring task -> only file_ops tools needed
+  const mockAgent = {
+    inbox: {
+      hasPending: true,
+      nextStep: [{ content: "Please refactor and edit the file lib/index.js" }],
+    },
+  };
+
+  const assembly = {
+    tools: [
+      { name: "read" },
+      { name: "write" },
+      { name: "edit" },
+      { name: "web_search" },
+      { name: "generate_image" },
+      { name: "cordis_define" },
+    ],
+    sections: [
+      { name: "persona", text: "Core persona" },
+      { name: "free-search", text: "Search engines info" },
+    ],
+  };
+
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  const toolNames = res.tools.map((t) => t.name);
+
+  // File ops tools kept because user asked to refactor & edit file
+  assert.ok(toolNames.includes("read"));
+  assert.ok(toolNames.includes("write"));
+  assert.ok(toolNames.includes("edit"));
+
+  // Web search, image, cordis pruned
+  assert.ok(!toolNames.includes("web_search"));
+  assert.ok(!toolNames.includes("generate_image"));
+  assert.ok(!toolNames.includes("cordis_define"));
+
+  // Non-matching sections pruned
+  const sectionNames = res.sections.map((s) => s.name);
+  assert.ok(sectionNames.includes("persona"));
+  assert.ok(!sectionNames.includes("free-search"));
+  assert.equal(telemetry.promptsPrunedCount, 1);
+});
+
+test("promptPruneHook extreme mode with pure reasoning query drops all tools", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const config = { enabled: true, toolPruningMode: "extreme", modules: { promptPruning: true } };
+  const hook = createPromptPruneHook({}, {}, () => config, telemetry);
+
+  const mockAgent = {
+    inbox: {
+      hasPending: true,
+      nextStep: [{ content: "Explain why 1 + 1 equals 2 in detail" }],
+    },
+  };
 
   const assembly = {
     tools: [{ name: "read" }, { name: "write" }, { name: "web_search" }],
@@ -147,11 +202,10 @@ test("promptPruneHook extreme mode prunes ALL tools", async () => {
     ],
   };
 
-  const res = await hook(assembly, {}, () => Promise.resolve(assembly));
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
   assert.equal(res.tools.length, 0);
   assert.equal(res.sections.length, 1);
   assert.equal(res.sections[0].name, "persona");
-  assert.equal(telemetry.promptsPrunedCount, 1);
 });
 
 test("promptPruneHook off mode leaves all tools and sections intact", async () => {
