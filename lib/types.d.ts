@@ -39,6 +39,8 @@ export interface Config {
   model: string;
   decoupleThreshold: number;
   modelTiers: ModelTiers;
+  pinnedTools?: string[];
+  failOpen?: boolean;
   modules: ModulesConfig;
 }
 

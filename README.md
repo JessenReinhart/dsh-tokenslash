@@ -53,6 +53,8 @@ Plugin mounts via `cordis.patch.yml` (`id: tokenslash`). Host entry `lib/index.j
 | `modelTiers.medium` | string (CSV) | `gemini-2.5-pro, claude-3-5-haiku` | Medium tier list |
 | `modelTiers.smart` | string (CSV) | `deepseek-reasoner, claude-3-7-sonnet, gpt-4o` | Smart tier list |
 | `toolPruningMode` | string | `"normal"` | Pruning mode: `"normal"` (intent-based, keep core tools), `"extreme"` (prune all tools), `"off"` (no tool pruning) |
+| `pinnedTools` | array of strings | `[]` | Explicit tool names to preserve regardless of intent or extreme pruning |
+| `failOpen` | boolean | `true` | Preserve all tool groups if triage endpoint fails or returns invalid response |
 | `modules.subagentRouting` | boolean | `true` | Enable routing hook + auto-route handler |
 | `modules.toolPruning` | boolean | `true` | Enable tool output prune hook |
 | `modules.promptPruning` | boolean | `true` | Enable system prompt & tool schema pruning before model request |

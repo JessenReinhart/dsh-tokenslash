@@ -25,6 +25,8 @@ export default function SettingsCard({
     model: "deepseek-chat",
     decoupleThreshold: 0.6,
     modelTiers: { cheap: "", medium: "", smart: "" },
+    pinnedTools: [],
+    failOpen: true,
     modules: {
       subagentRouting: true,
       forkDecoupling: true,
@@ -263,6 +265,35 @@ export default function SettingsCard({
           <div className="ts-hint">
             Extreme strips all tool schemas for pure reasoning / text turns. Off keeps all tools.
           </div>
+        </div>
+
+        {/* Pinned Tools */}
+        <div className="ts-field" style={{ marginTop: "14px" }}>
+          <label className="ts-label">Pinned Tools</label>
+          <input
+            type="text"
+            className="ts-input"
+            placeholder="e.g. read, edit, write, bash"
+            value={Array.isArray(activeConfig.pinnedTools) ? activeConfig.pinnedTools.join(", ") : (activeConfig.pinnedTools || "")}
+            onChange={(e) => {
+              const arr = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+              updateConfig({ ...activeConfig, pinnedTools: arr });
+            }}
+          />
+          <div className="ts-hint">Tools that always survive pruning, comma-separated.</div>
+        </div>
+
+        {/* Fail Open */}
+        <div className="ts-field" style={{ marginTop: "14px" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={activeConfig.failOpen !== false}
+              onChange={(e) => updateConfig({ ...activeConfig, failOpen: e.target.checked })}
+            />
+            Fail Open on Triage Error
+          </label>
+          <div className="ts-hint">Preserve all tool groups if triage fails or returns invalid response.</div>
         </div>
 
         {/* Module Toggles */}

@@ -119,6 +119,7 @@ test("plugin lifecycle: wires agent/inbox/claimed and system-prompt/assemble in 
   const applied = plugin.apply(ctx, {
     enabled: true,
     toolPruningMode: "normal",
+    failOpen: false,
     modules: { promptPruning: true },
   });
 

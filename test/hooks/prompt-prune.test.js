@@ -4,6 +4,11 @@ import {
   createPromptPruneHook,
   detectRequiredGroups,
   extractRecentUserPrompt,
+  isShortResumePrompt,
+  hasUnfinishedAssistantIntent,
+  detectResumeSignal,
+  detectRequiredGroupsViaJev,
+  TOOL_GROUPS,
   CORE_TOOLS,
 } from "../../lib/hooks/prompt-prune.js";
 import { TokenslashTelemetry } from "../../lib/telemetry.js";
@@ -308,4 +313,111 @@ test("promptPruneHook works with promptTracker in waterfall assembly", async () 
   assert.ok(!sectionNames.includes("dynamic-cordis-plugins"));
   assert.ok(sectionNames.includes("persona"));
   assert.equal(telemetry.promptsPrunedCount, 1);
+});
+
+test("isShortResumePrompt distinguishes resume keywords from short fresh tasks", () => {
+  assert.equal(isShortResumePrompt("continue"), true);
+  assert.equal(isShortResumePrompt("proceed"), true);
+  assert.equal(isShortResumePrompt("keep going"), true);
+  assert.equal(isShortResumePrompt("go on"), true);
+  assert.equal(isShortResumePrompt("Count lines in package.json"), false);
+  assert.equal(isShortResumePrompt("run git status"), false);
+  assert.equal(isShortResumePrompt("explain 1+1=2"), false);
+});
+
+test("hasUnfinishedAssistantIntent recognizes unfinished intent in assistant message", () => {
+  const matchingContext = {
+    messages: [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: [{ type: "text", text: "I did step 1. Remaining work: edit lib/index.js" }] },
+    ],
+  };
+  assert.equal(hasUnfinishedAssistantIntent(matchingContext), true);
+
+  const doneContext = {
+    messages: [
+      { role: "assistant", content: "All done! Everything passed." },
+    ],
+  };
+  assert.equal(hasUnfinishedAssistantIntent(doneContext), false);
+
+  assert.equal(detectResumeSignal("continue", doneContext), "short_prompt");
+  assert.equal(detectResumeSignal("hello", matchingContext), "unfinished_task");
+  assert.equal(detectResumeSignal("hello", doneContext), null);
+});
+
+test("F1: resume-mask inherits active groups across turns for same agent", async () => {
+  const tracker = new Map();
+  const mockAgent = { id: "agent-f1-resume" };
+  const hook = createPromptPruneHook({}, {}, () => ({ enabled: true, toolPruningMode: "normal" }), new TokenslashTelemetry(), tracker);
+
+  const assembly = {
+    tools: [{ name: "read" }, { name: "generate_image" }, { name: "web_search" }],
+    sections: [{ name: "persona" }, { name: "image", text: "Image generation docs" }, { name: "free-search", text: "Search docs" }],
+  };
+
+  // Turn 1: user requests image generation
+  tracker.set(mockAgent.id, "Generate an illustration of a robot");
+  const turn1 = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  assert.ok(turn1.tools.map((t) => t.name).includes("generate_image"));
+  assert.ok(!turn1.tools.map((t) => t.name).includes("web_search"));
+
+  // Turn 2: short resume nudge
+  tracker.set(mockAgent.id, "continue");
+  const turn2 = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  assert.ok(turn2.tools.map((t) => t.name).includes("generate_image"), "generate_image inherited from turn 1");
+  assert.ok(!turn2.tools.map((t) => t.name).includes("web_search"), "unrelated tools stay pruned");
+});
+
+test("F1 safety net: turn 1 resume signal with no history and no detected tools bails out", async () => {
+  const hook = createPromptPruneHook({}, {}, () => ({ enabled: true, toolPruningMode: "extreme" }), new TokenslashTelemetry());
+  const mockAgent = { id: "agent-fresh-resume", inbox: { nextStep: [{ content: "continue" }] } };
+  const assembly = {
+    tools: [{ name: "read" }, { name: "generate_image" }],
+    sections: [{ name: "persona" }],
+  };
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  assert.deepEqual(res, assembly, "Safety net prevents stripping tools bare on unanchored resume");
+});
+
+test("F2: pinnedTools survive pruning in extreme mode and preserve section docs", async () => {
+  const config = {
+    enabled: true,
+    toolPruningMode: "extreme",
+    pinnedTools: ["generate_image", "read"],
+  };
+  const hook = createPromptPruneHook({}, {}, () => config, new TokenslashTelemetry());
+  const mockAgent = { id: "agent-f2", inbox: { nextStep: [{ content: "Explain quantum mechanics in pure text" }] } };
+  const assembly = {
+    tools: [{ name: "read" }, { name: "generate_image" }, { name: "web_search" }],
+    sections: [{ name: "persona" }, { name: "image", text: "Image generation docs" }, { name: "free-search", text: "Search docs" }],
+  };
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  const toolNames = res.tools.map((t) => t.name);
+  assert.ok(toolNames.includes("generate_image"), "User pinned tool preserved in extreme mode");
+  assert.ok(toolNames.includes("read"), "Core tool in pinnedTools preserved in extreme mode");
+  assert.ok(!toolNames.includes("web_search"), "Non-pinned tool pruned in extreme mode");
+  assert.ok(res.sections.map((s) => s.name).includes("image"), "Pinned tool section preserved");
+  assert.ok(!res.sections.map((s) => s.name).includes("free-search"), "Unpinned tool section pruned");
+});
+
+test("F3: detectRequiredGroupsViaJev failOpen returns all groups on error or malformed response", async () => {
+  const badClient = { triage: async () => { throw new Error("timeout"); } };
+  const groupsError = await detectRequiredGroupsViaJev("do work", badClient, { failOpen: true });
+  assert.equal(groupsError.size, Object.keys(TOOL_GROUPS).length);
+
+  const fallbackGroups = await detectRequiredGroupsViaJev("do work", badClient, { failOpen: false });
+  assert.equal(fallbackGroups.size, 0);
+
+  const malformedClient = { triage: async () => ({ answers: {} }) };
+  const groupsMalformed = await detectRequiredGroupsViaJev("do work", malformedClient, { failOpen: true });
+  assert.equal(groupsMalformed.size, Object.keys(TOOL_GROUPS).length);
+});
+
+test("FIFO eviction keeps lastActiveGroups bounded to 100 entries", async () => {
+  const hook = createPromptPruneHook({}, {}, () => ({ enabled: true }), new TokenslashTelemetry());
+  const assembly = { tools: [{ name: "read" }], sections: [] };
+  for (let i = 0; i < 105; i++) {
+    await hook(assembly, { agent: { id: `agent-${i}` }, inbox: { nextStep: [{ content: `Search web ${i}` }] } }, () => Promise.resolve(assembly));
+  }
 });

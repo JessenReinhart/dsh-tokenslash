@@ -6,6 +6,11 @@ import { parseConfig, parseModelTiers, getConfigForProvider } from "../lib/confi
 await test("parseConfig defaults", async () => {
   const cfg = parseConfig({});
   assert.equal(cfg.enabled, true);
+  assert.deepEqual(cfg.pinnedTools, []);
+  assert.equal(cfg.failOpen, true);
+  const custom = parseConfig({ pinnedTools: ["custom_tool", "another_tool"], failOpen: false });
+  assert.deepEqual(custom.pinnedTools, ["custom_tool", "another_tool"]);
+  assert.equal(custom.failOpen, false);
 });
 
 await test("parseModelTiers splits strings", async () => {

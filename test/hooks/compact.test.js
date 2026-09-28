@@ -3,6 +3,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createCompactHook } from "../../lib/hooks/compact.js";
 
+const mockLLMCtx = {
+  llm: {
+    stream: async function* () {
+      yield { content: "brief summary of old talk" };
+    }
+  }
+};
+
 test("compactHook leaves short conversations alone", async () => {
   const hook = createCompactHook({}, {});
   const msgs = [{ role: "user", content: "hello" }];
@@ -22,10 +30,7 @@ test("compactHook condenses context when exceeding threshold", async () => {
     { role: "assistant", content: "ok" },
     { role: "user", content: "latest prompt" },
   ];
-  const mockJev = {
-    triage: async () => ({ summarize: "brief summary of old talk" }),
-  };
-  const hook = createCompactHook({}, mockJev);
+  const hook = createCompactHook(mockLLMCtx);
   const res = await hook(msgs);
   assert.equal(res.length, 2);
   assert.equal(res[0].role, "system");
@@ -36,12 +41,7 @@ test("compactHook condenses context when exceeding threshold", async () => {
 test("compactHook fails open on error", async () => {
   const longText = "word ".repeat(8000);
   const msgs = [{ role: "user", content: longText }];
-  const mockJev = {
-    triage: async () => {
-      throw new Error("fail");
-    },
-  };
-  const hook = createCompactHook({}, mockJev);
+  const hook = createCompactHook({});
   const res = await hook(msgs);
   assert.deepEqual(res, msgs);
 });
