@@ -133,3 +133,42 @@ test("promptPruneHook keeps relevant tools when prompt requires them", async () 
   const sectionNames = res.sections.map((s) => s.name);
   assert.ok(sectionNames.includes("free-search"));
 });
+
+test("promptPruneHook extreme mode prunes ALL tools", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const config = { enabled: true, toolPruningMode: "extreme", modules: { promptPruning: true } };
+  const hook = createPromptPruneHook({}, {}, () => config, telemetry);
+
+  const assembly = {
+    tools: [{ name: "read" }, { name: "write" }, { name: "web_search" }],
+    sections: [
+      { name: "persona", text: "Core persona" },
+      { name: "free-search", text: "Search engines info" },
+    ],
+  };
+
+  const res = await hook(assembly, {}, () => Promise.resolve(assembly));
+  assert.equal(res.tools.length, 0);
+  assert.equal(res.sections.length, 1);
+  assert.equal(res.sections[0].name, "persona");
+  assert.equal(telemetry.promptsPrunedCount, 1);
+});
+
+test("promptPruneHook off mode leaves all tools and sections intact", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const config = { enabled: true, toolPruningMode: "off", modules: { promptPruning: true } };
+  const hook = createPromptPruneHook({}, {}, () => config, telemetry);
+
+  const assembly = {
+    tools: [{ name: "read" }, { name: "write" }, { name: "web_search" }],
+    sections: [
+      { name: "persona", text: "Core persona" },
+      { name: "free-search", text: "Search engines info" },
+    ],
+  };
+
+  const res = await hook(assembly, {}, () => Promise.resolve(assembly));
+  assert.equal(res.tools.length, 3);
+  assert.equal(res.sections.length, 2);
+  assert.equal(telemetry.promptsPrunedCount, 0);
+});

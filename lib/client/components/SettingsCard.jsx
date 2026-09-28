@@ -234,6 +234,34 @@ export default function SettingsCard({
             />
           ))}
         </div>
+
+        {/* Tool Pruning Mode Selector */}
+        <div className="ts-field" style={{ marginTop: "14px" }}>
+          <label className="ts-label">Tool Pruning Mode</label>
+          <select
+            className="ts-select"
+            value={activeConfig.toolPruningMode || activeConfig.modules?.toolPruningMode || "normal"}
+            onChange={(e) => {
+              const val = e.target.value;
+              updateConfig({
+                ...activeConfig,
+                toolPruningMode: val,
+                modules: {
+                  ...(activeConfig.modules || {}),
+                  toolPruningMode: val,
+                  toolPruning: val !== "off",
+                },
+              });
+            }}
+          >
+            <option value="normal">Normal (Intent-based pruning, keep core tools)</option>
+            <option value="extreme">Extreme (Prune ALL tools & tool guides)</option>
+            <option value="off">Off (Do not prune tools)</option>
+          </select>
+          <div className="ts-hint">
+            Extreme strips all tool schemas for pure reasoning / text turns. Off keeps all tools.
+          </div>
+        </div>
       </div>
 
       {/* Section 3: Telemetry Stats */}
