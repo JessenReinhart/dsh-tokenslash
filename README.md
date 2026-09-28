@@ -4,8 +4,9 @@ TokenSlash optimization suite for DeepSeek Harness (DSH). Routes subagents to ch
 
 ## Features
 
+- **System prompt & tool schema pruning** — `system-prompt/assemble` waterfall strips unused tool schemas and related verbose prompt sections based on intent, saving 3K-8K input tokens per turn.
 - **Subagent routing** — `tokenslash_triage` decisions fork work to cheap/medium/smart tiers, saves tokens per decouple.
-- **Tool schema pruning** — post-execute hook strips oversized JSON payloads over 10KB to compact summaries.
+- **Tool output pruning** — post-execute hook strips oversized JSON payloads over 10KB to compact summaries.
 - **Output compacting** — prompt-assemble hook summarizes history when context exceeds ~8K tokens.
 - **Goal guard** — warns at 80% of max goal rounds, emits notice via `ctx.app.notice`/`ctx.notice`.
 - **Provider fan-out** — OpenCode Zen, 9Router, OpenRouter, TypeSafe Jev, Custom endpoint with cached model discovery.
@@ -37,7 +38,8 @@ Plugin mounts via `cordis.patch.yml` (`id: tokenslash`). Host entry `lib/index.j
 | `modelTiers.medium` | string (CSV) | `gemini-2.5-pro, claude-3-5-haiku` | Medium tier list |
 | `modelTiers.smart` | string (CSV) | `deepseek-reasoner, claude-3-7-sonnet, gpt-4o` | Smart tier list |
 | `modules.subagentRouting` | boolean | `true` | Enable routing hook + auto-route handler |
-| `modules.toolPruning` | boolean | `true` | Enable prune decisions/questions |
+| `modules.toolPruning` | boolean | `true` | Enable tool output prune hook |
+| `modules.promptPruning` | boolean | `true` | Enable system prompt & tool schema pruning before model request |
 | `modules.outputCompacting` | boolean | `true` | Enable compact hook |
 | `modules.goalGuard` | boolean | `true` | Enable goal budget warnings |
 
