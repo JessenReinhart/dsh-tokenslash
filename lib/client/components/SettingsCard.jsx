@@ -5,8 +5,8 @@ import { fetchConfig, saveConfig, testConnection, fetchStats, fetchModels } from
 const DEFAULT_TIERS = [
   { key: "cheap", label: "Cheap", color: "#3fb950", badge: "Fast", hint: "Simple, highly bounded tasks" },
   { key: "medium", label: "Medium", color: "#58a6ff", badge: "Balanced", hint: "Moderate reasoning, balanced cost" },
-  { key: "smart", label: "Smart", color: "#d29922", badge: "Deep", hint: "Complex context, high-end reasoning" },
-  { key: "extreme", label: "Extreme", color: "#bc8cff", badge: "Max", hint: "Most capable model for hardest tasks" },
+  { key: "smart", label: "Smart", color: "#bc8cff", badge: "Deep", hint: "Complex context, high-end reasoning" },
+  { key: "extreme", label: "Extreme", color: "#f85149", badge: "Max", hint: "Max complexity, benchmark / audit tasks" },
 ];
 
 export default function SettingsCard({
@@ -24,11 +24,12 @@ export default function SettingsCard({
     apiKey: "",
     model: "deepseek-chat",
     decoupleThreshold: 0.6,
-    modelTiers: { cheap: "", medium: "", smart: "", extreme: "" },
+    modelTiers: { cheap: "", medium: "", smart: "" },
     modules: {
       subagentRouting: true,
       forkDecoupling: true,
       toolPruning: true,
+      promptPruning: true,
       compaction: true,
       goalGuard: true,
     },
@@ -214,6 +215,7 @@ export default function SettingsCard({
           {DEFAULT_TIERS.map((tier) => (
             <ModelPicker
               key={tier.key}
+              tierKey={tier.key}
               label={tier.label}
               color={tier.color}
               badge={tier.badge}
@@ -262,6 +264,110 @@ export default function SettingsCard({
             Extreme strips all tool schemas for pure reasoning / text turns. Off keeps all tools.
           </div>
         </div>
+
+        {/* Module Toggles */}
+        <div style={{ marginTop: "14px" }}>
+          <label className="ts-label" style={{ display: "block", marginBottom: "8px" }}>Module Toggles</label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={activeConfig.modules?.subagentRouting !== false}
+                onChange={(e) =>
+                  updateConfig({
+                    ...activeConfig,
+                    modules: {
+                      ...(activeConfig.modules || {}),
+                      subagentRouting: e.target.checked,
+                    },
+                  })
+                }
+              />
+              Subagent Routing
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={activeConfig.modules?.forkDecoupling !== false}
+                onChange={(e) =>
+                  updateConfig({
+                    ...activeConfig,
+                    modules: {
+                      ...(activeConfig.modules || {}),
+                      forkDecoupling: e.target.checked,
+                    },
+                  })
+                }
+              />
+              Fork Decoupling
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={activeConfig.modules?.toolPruning !== false}
+                onChange={(e) =>
+                  updateConfig({
+                    ...activeConfig,
+                    modules: {
+                      ...(activeConfig.modules || {}),
+                      toolPruning: e.target.checked,
+                    },
+                  })
+                }
+              />
+              Tool Pruning
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={activeConfig.modules?.promptPruning !== false}
+                onChange={(e) =>
+                  updateConfig({
+                    ...activeConfig,
+                    modules: {
+                      ...(activeConfig.modules || {}),
+                      promptPruning: e.target.checked,
+                    },
+                  })
+                }
+              />
+              Prompt Pruning
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={activeConfig.modules?.compaction !== false && activeConfig.modules?.outputCompacting !== false}
+                onChange={(e) =>
+                  updateConfig({
+                    ...activeConfig,
+                    modules: {
+                      ...(activeConfig.modules || {}),
+                      compaction: e.target.checked,
+                      outputCompacting: e.target.checked,
+                    },
+                  })
+                }
+              />
+              Output Compaction
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={activeConfig.modules?.goalGuard !== false}
+                onChange={(e) =>
+                  updateConfig({
+                    ...activeConfig,
+                    modules: {
+                      ...(activeConfig.modules || {}),
+                      goalGuard: e.target.checked,
+                    },
+                  })
+                }
+              />
+              Goal Guard
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* Section 3: Telemetry Stats */}
@@ -271,25 +377,31 @@ export default function SettingsCard({
           <div className="ts-stats-grid">
             <div className="ts-stat-card">
               <span className="ts-stat-value">
-                {activeStats?.tokensSaved ? activeStats.tokensSaved.toLocaleString() : "0"}
+                {((activeStats?.totalTokensSaved ?? activeStats?.tokensSaved) || 0).toLocaleString()}
               </span>
               <span className="ts-stat-label">Estimated Tokens Saved</span>
             </div>
             <div className="ts-stat-card">
               <span className="ts-stat-value">
-                {activeStats?.forksDecoupled ?? 0}
+                {activeStats?.subagentsDecoupledCount ?? activeStats?.forksDecoupled ?? 0}
               </span>
-              <span className="ts-stat-label">Forks Decoupled</span>
+              <span className="ts-stat-label">Subagents Decoupled</span>
             </div>
             <div className="ts-stat-card">
               <span className="ts-stat-value">
-                {activeStats?.schemasPruned ?? 0}
+                {activeStats?.toolsPrunedCount ?? activeStats?.schemasPruned ?? 0}
               </span>
-              <span className="ts-stat-label">Tool Schemas Pruned</span>
+              <span className="ts-stat-label">Tools Pruned</span>
             </div>
             <div className="ts-stat-card">
               <span className="ts-stat-value">
-                {activeStats?.outputsCompacted ?? 0}
+                {activeStats?.promptsPrunedCount ?? 0}
+              </span>
+              <span className="ts-stat-label">Prompts Pruned</span>
+            </div>
+            <div className="ts-stat-card">
+              <span className="ts-stat-value">
+                {activeStats?.outputsCompactedCount ?? activeStats?.outputsCompacted ?? 0}
               </span>
               <span className="ts-stat-label">Outputs Compacted</span>
             </div>

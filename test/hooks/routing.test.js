@@ -67,7 +67,16 @@ test("classifyTaskTier and pickTierModel behave correctly", () => {
   };
   assert.equal(pickTierModel("cheap", config), "cheap-model-1");
   assert.equal(pickTierModel("smart", config), "smart-model-1");
-  assert.equal(pickTierModel("unknown", config), "default-model");
+  assert.equal(pickTierModel("unknown", config), null);
+
+  // Filters out Jev decision models so subagents are not routed to triage models
+  const jevConfig = {
+    model: "jev-1.13-free",
+    modelTiers: {
+      cheap: "jev-1.13-free, deepseek-chat",
+    },
+  };
+  assert.equal(pickTierModel("cheap", jevConfig), "deepseek-chat");
 });
 
 test("interceptSubagentRequest routes when model is unspecified", async () => {

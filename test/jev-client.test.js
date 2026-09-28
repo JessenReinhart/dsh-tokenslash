@@ -75,10 +75,10 @@ test("testConnection failure", async () => {
 
 test("buildUrl correctly resolves endpoint for systemone bases and empty path", () => {
   const c1 = new JevClient({ provider: "opencode" });
-  assert.equal(c1.buildUrl(), "https://opencode.ai/v1/systemone");
-  assert.equal(c1.buildUrl("/v1/systemone"), "https://opencode.ai/v1/systemone");
+  assert.equal(c1.buildUrl(), "https://opencode.ai/zen/v1/systemone");
+  assert.equal(c1.buildUrl("/v1/systemone"), "https://opencode.ai/zen/v1/systemone");
 
-  const c2 = new JevClient({ customBaseUrl: "http://127.0.0.1:20128/v1/systemone", provider: "custom" });
+  const c2 = new JevClient({ customBaseUrl: "http://127.0.0.1:20128/v1/systemone", provider: "9router" });
   assert.equal(c2.buildUrl(), "http://127.0.0.1:20128/v1/systemone");
 
   const c3 = new JevClient({ provider: "openrouter" });
@@ -105,7 +105,7 @@ test("triage sends state and model in payload", async () => {
   try {
     const client = new JevClient({ provider: "opencode" });
     const res = await client.triage({ route: "test" });
-    assert.equal(capturedUrl, "https://opencode.ai/v1/systemone");
+    assert.equal(capturedUrl, "https://opencode.ai/zen/v1/systemone");
     assert.equal(capturedBody.state, "triage");
     assert.equal(capturedBody.model, "jev-1.13-free");
     assert.deepEqual(capturedBody.questions, { route: "test" });
@@ -132,7 +132,7 @@ test("testConnection sends ping payload with state", async () => {
   try {
     const client = new JevClient({ provider: "opencode" });
     const res = await client.testConnection();
-    assert.equal(capturedUrl, "https://opencode.ai/v1/systemone");
+    assert.equal(capturedUrl, "https://opencode.ai/zen/v1/systemone");
     assert.equal(capturedBody.state, "ping");
     assert.deepEqual(capturedBody.questions, {
       ping: { type: "noul", instructions: "ping" },

@@ -80,3 +80,93 @@ test("plugin lifecycle: loads cleanly in Cordis context with mock services", asy
   assert.equal(settings.sections.length, 1, "Settings section installed");
   assert.equal(settings.sections[0].ns, "tokenslash");
 });
+
+test("plugin lifecycle: wires agent/inbox/claimed and system-prompt/assemble in Cordis", async () => {
+  const ctx = new Context();
+
+  class ToolsSvc extends Service {
+    constructor(c) {
+      super(c, "tools", true);
+    }
+    register() {
+      return () => {};
+    }
+  }
+
+  class WebServerSvc extends Service {
+    constructor(c) {
+      super(c, "webServer", true);
+    }
+    register() {
+      return () => {};
+    }
+  }
+
+  class SettingsSvc extends Service {
+    constructor(c) {
+      super(c, "settings", true);
+    }
+    installSection() {}
+    get() {
+      return {};
+    }
+  }
+
+  new ToolsSvc(ctx);
+  new WebServerSvc(ctx);
+  new SettingsSvc(ctx);
+
+  const applied = plugin.apply(ctx, {
+    enabled: true,
+    toolPruningMode: "normal",
+    modules: { promptPruning: true },
+  });
+
+  const mockAgent = { id: "test-lifecycle-agent" };
+
+  // 1. Emit agent/inbox/claimed
+  ctx.emit("agent/inbox/claimed", {
+    agent: mockAgent,
+    message: {
+      content: [{ type: "text", text: "Please search web for cordis plugins" }],
+    },
+    turn: 1,
+  });
+
+  assert.equal(applied.claimedPrompts.get(mockAgent.id), "Please search web for cordis plugins");
+
+  // 2. Dispatch system-prompt/assemble waterfall
+  const assembly = {
+    tools: [
+      { name: "read" },
+      { name: "web_search" },
+      { name: "generate_image" },
+    ],
+    sections: [
+      { name: "persona", text: "Persona" },
+      { name: "free-search", text: "Free search details" },
+      { name: "image", text: "Image generation guidelines" },
+    ],
+    variables: {},
+  };
+
+  const context = { agent: mockAgent };
+  const result = await ctx.waterfall("system-prompt/assemble", assembly, context, () => Promise.resolve(assembly));
+
+  const toolNames = result.tools.map((t) => t.name);
+  assert.ok(toolNames.includes("read"), "Core tool read preserved");
+  assert.ok(toolNames.includes("web_search"), "web_search preserved for search prompt");
+  assert.ok(!toolNames.includes("generate_image"), "generate_image pruned");
+
+  const sectionNames = result.sections.map((s) => s.name);
+  assert.ok(sectionNames.includes("persona"));
+  assert.ok(sectionNames.includes("free-search"));
+  assert.ok(!sectionNames.includes("image"), "Image section pruned");
+
+  // 3. Telemetry updated
+  assert.equal(applied.telemetry.toolsPrunedCount, 1);
+  assert.equal(applied.telemetry.promptsPrunedCount, 1);
+
+  // 4. Dispose cleans up cleanly
+  applied.dispose();
+});

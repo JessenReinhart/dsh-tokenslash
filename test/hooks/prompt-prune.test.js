@@ -226,3 +226,86 @@ test("promptPruneHook off mode leaves all tools and sections intact", async () =
   assert.equal(res.sections.length, 2);
   assert.equal(telemetry.promptsPrunedCount, 0);
 });
+
+test("extractRecentUserPrompt extracts from promptTracker cache", () => {
+  const tracker = new Map();
+  tracker.set("agent-123", "Search online documentation for Cordis lifecycle");
+
+  const agent = { id: "agent-123" };
+  const prompt = extractRecentUserPrompt({ agent }, tracker);
+  assert.equal(prompt, "Search online documentation for Cordis lifecycle");
+});
+
+test("extractRecentUserPrompt extracts from agent.session surface events", () => {
+  const mockSession = {
+    surface: { nodes: [0, 1, 2] },
+    eventAt(seq) {
+      if (seq === 1) {
+        return {
+          type: "user/message",
+          data: {
+            message: {
+              content: [{ type: "text", text: "Please generate an image of a red panda" }],
+            },
+          },
+        };
+      }
+      return null;
+    },
+  };
+
+  const agent = { id: "agent-456", session: mockSession };
+  const prompt = extractRecentUserPrompt({ agent });
+  assert.equal(prompt, "Please generate an image of a red panda");
+});
+
+test("extractRecentUserPrompt extracts from agent.inbox.nextTurn", () => {
+  const agent = {
+    id: "agent-789",
+    inbox: {
+      nextStep: [],
+      nextTurn: [{ content: "Check git status and commit changes" }],
+    },
+  };
+
+  const prompt = extractRecentUserPrompt({ agent });
+  assert.equal(prompt, "Check git status and commit changes");
+});
+
+test("promptPruneHook works with promptTracker in waterfall assembly", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const config = { enabled: true, toolPruningMode: "normal", modules: { promptPruning: true } };
+  const tracker = new Map();
+  const mockAgent = { id: "agent-test-waterfall" };
+  tracker.set(mockAgent.id, "Generate an avatar image for my profile");
+
+  const hook = createPromptPruneHook({}, {}, () => config, telemetry, tracker);
+
+  const assembly = {
+    tools: [
+      { name: "read" },
+      { name: "generate_image" },
+      { name: "cordis_define" },
+    ],
+    sections: [
+      { name: "persona", text: "Persona" },
+      { name: "dynamic-cordis-plugins", text: "Cordis guide" },
+    ],
+  };
+
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  const toolNames = res.tools.map((t) => t.name);
+
+  // Core tool kept
+  assert.ok(toolNames.includes("read"));
+  // Image tool kept because user asked to generate image
+  assert.ok(toolNames.includes("generate_image"));
+  // Cordis tool pruned
+  assert.ok(!toolNames.includes("cordis_define"));
+
+  // Cordis section pruned
+  const sectionNames = res.sections.map((s) => s.name);
+  assert.ok(!sectionNames.includes("dynamic-cordis-plugins"));
+  assert.ok(sectionNames.includes("persona"));
+  assert.equal(telemetry.promptsPrunedCount, 1);
+});
