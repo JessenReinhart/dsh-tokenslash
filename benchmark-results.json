@@ -1,0 +1,90 @@
+{
+  "task": "Audit the lib/ directory of this repo for security issues, error handling gaps, dead code, and async safety problems. Report specific issues with file and line references.",
+  "date": "2026-09-29T01:57:11.896Z",
+  "nodeVersion": "v24.11.1",
+  "jevModel": "openrouter/typesafe/jev-1.13",
+  "jevEndpoint": "http://127.0.0.1:20128/v1/systemone",
+  "totalToolsInSession": 50,
+  "totalSectionsInSystemMessage": 9,
+  "baselineChars": "18036 tokens (72142 chars)",
+  "results": [
+    {
+      "mode": "off",
+      "label": "Baseline (pruning off)",
+      "tools": {
+        "baseline": 50,
+        "kept": 50,
+        "pruned": 0
+      },
+      "sections": {
+        "baseline": 9,
+        "kept": 9,
+        "pruned": 0
+      },
+      "tokens": {
+        "baseline": 18036,
+        "after": 18036,
+        "saved": 0,
+        "reductionPct": "0.0"
+      },
+      "chars": {
+        "baseline": 72142,
+        "after": 72142,
+        "saved": 0
+      },
+      "hookMs": 0
+    },
+    {
+      "mode": "normal",
+      "label": "Normal mode",
+      "tools": {
+        "baseline": 50,
+        "kept": 12,
+        "pruned": 38
+      },
+      "sections": {
+        "baseline": 9,
+        "kept": 1,
+        "pruned": 8
+      },
+      "tokens": {
+        "baseline": 18036,
+        "after": 3813,
+        "saved": 14223,
+        "reductionPct": "78.9"
+      },
+      "chars": {
+        "baseline": 72142,
+        "after": 15250,
+        "saved": 56892
+      },
+      "hookMs": 1013
+    },
+    {
+      "mode": "extreme",
+      "label": "Extreme mode",
+      "tools": {
+        "baseline": 50,
+        "kept": 7,
+        "pruned": 43
+      },
+      "sections": {
+        "baseline": 9,
+        "kept": 2,
+        "pruned": 7
+      },
+      "tokens": {
+        "baseline": 18036,
+        "after": 3055,
+        "saved": 14981,
+        "reductionPct": "83.1"
+      },
+      "chars": {
+        "baseline": 72142,
+        "after": 12220,
+        "saved": 59922
+      },
+      "hookMs": 544
+    }
+  ]
+}

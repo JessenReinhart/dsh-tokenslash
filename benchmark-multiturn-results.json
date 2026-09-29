@@ -1,0 +1,205 @@
+{
+  "task": "Audit lib/ directory across 4 turns",
+  "date": "2026-09-29T01:57:27.959Z",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "Audit the lib/ directory of this repo for security issues, error handling gaps, dead code, and async safety problems. Start by scanning files."
+    },
+    {
+      "turn": 2,
+      "prompt": "Proceed to read lib/index.js and lib/jev-client.js to check error handling."
+    },
+    {
+      "turn": 3,
+      "prompt": "continue"
+    },
+    {
+      "turn": 4,
+      "prompt": "Summarize the audit findings in a clear table report."
+    }
+  ],
+  "off": {
+    "mode": "off",
+    "turns": [
+      {
+        "turn": 1,
+        "prompt": "Audit the lib/ directory of this repo for security issues, error handling gaps, dead code, and async safety problems. Start by scanning files.",
+        "toolsKept": 50,
+        "toolsPruned": 0,
+        "sectionsKept": 9,
+        "sectionsPruned": 0,
+        "baselineTokens": 18036,
+        "actualTokens": 18036,
+        "savedTokens": 0,
+        "reductionPct": "0.0",
+        "hookMs": 1
+      },
+      {
+        "turn": 2,
+        "prompt": "Proceed to read lib/index.js and lib/jev-client.js to check error handling.",
+        "toolsKept": 50,
+        "toolsPruned": 0,
+        "sectionsKept": 9,
+        "sectionsPruned": 0,
+        "baselineTokens": 18036,
+        "actualTokens": 18036,
+        "savedTokens": 0,
+        "reductionPct": "0.0",
+        "hookMs": 0
+      },
+      {
+        "turn": 3,
+        "prompt": "continue",
+        "toolsKept": 50,
+        "toolsPruned": 0,
+        "sectionsKept": 9,
+        "sectionsPruned": 0,
+        "baselineTokens": 18036,
+        "actualTokens": 18036,
+        "savedTokens": 0,
+        "reductionPct": "0.0",
+        "hookMs": 0
+      },
+      {
+        "turn": 4,
+        "prompt": "Summarize the audit findings in a clear table report.",
+        "toolsKept": 50,
+        "toolsPruned": 0,
+        "sectionsKept": 9,
+        "sectionsPruned": 0,
+        "baselineTokens": 18036,
+        "actualTokens": 18036,
+        "savedTokens": 0,
+        "reductionPct": "0.0",
+        "hookMs": 0
+      }
+    ],
+    "totalBaseline": 72144,
+    "totalActual": 72144,
+    "totalSaved": 0,
+    "overallReduction": "0.0"
+  },
+  "normal": {
+    "mode": "normal",
+    "turns": [
+      {
+        "turn": 1,
+        "prompt": "Audit the lib/ directory of this repo for security issues, error handling gaps, dead code, and async safety problems. Start by scanning files.",
+        "toolsKept": 12,
+        "toolsPruned": 38,
+        "sectionsKept": 1,
+        "sectionsPruned": 8,
+        "baselineTokens": 18036,
+        "actualTokens": 3813,
+        "savedTokens": 14223,
+        "reductionPct": "78.9",
+        "hookMs": 631
+      },
+      {
+        "turn": 2,
+        "prompt": "Proceed to read lib/index.js and lib/jev-client.js to check error handling.",
+        "toolsKept": 12,
+        "toolsPruned": 38,
+        "sectionsKept": 1,
+        "sectionsPruned": 8,
+        "baselineTokens": 18036,
+        "actualTokens": 3813,
+        "savedTokens": 14223,
+        "reductionPct": "78.9",
+        "hookMs": 591
+      },
+      {
+        "turn": 3,
+        "prompt": "continue",
+        "toolsKept": 12,
+        "toolsPruned": 38,
+        "sectionsKept": 1,
+        "sectionsPruned": 8,
+        "baselineTokens": 18036,
+        "actualTokens": 3813,
+        "savedTokens": 14223,
+        "reductionPct": "78.9",
+        "hookMs": 591
+      },
+      {
+        "turn": 4,
+        "prompt": "Summarize the audit findings in a clear table report.",
+        "toolsKept": 12,
+        "toolsPruned": 38,
+        "sectionsKept": 0,
+        "sectionsPruned": 9,
+        "baselineTokens": 18036,
+        "actualTokens": 3402,
+        "savedTokens": 14634,
+        "reductionPct": "81.1",
+        "hookMs": 557
+      }
+    ],
+    "totalBaseline": 72144,
+    "totalActual": 14841,
+    "totalSaved": 57303,
+    "overallReduction": "79.4"
+  },
+  "extreme": {
+    "mode": "extreme",
+    "turns": [
+      {
+        "turn": 1,
+        "prompt": "Audit the lib/ directory of this repo for security issues, error handling gaps, dead code, and async safety problems. Start by scanning files.",
+        "toolsKept": 7,
+        "toolsPruned": 43,
+        "sectionsKept": 2,
+        "sectionsPruned": 7,
+        "baselineTokens": 18036,
+        "actualTokens": 3055,
+        "savedTokens": 14981,
+        "reductionPct": "83.1",
+        "hookMs": 597
+      },
+      {
+        "turn": 2,
+        "prompt": "Proceed to read lib/index.js and lib/jev-client.js to check error handling.",
+        "toolsKept": 5,
+        "toolsPruned": 45,
+        "sectionsKept": 2,
+        "sectionsPruned": 7,
+        "baselineTokens": 18036,
+        "actualTokens": 2633,
+        "savedTokens": 15402,
+        "reductionPct": "85.4",
+        "hookMs": 542
+      },
+      {
+        "turn": 3,
+        "prompt": "continue",
+        "toolsKept": 5,
+        "toolsPruned": 45,
+        "sectionsKept": 2,
+        "sectionsPruned": 7,
+        "baselineTokens": 18036,
+        "actualTokens": 2633,
+        "savedTokens": 15402,
+        "reductionPct": "85.4",
+        "hookMs": 548
+      },
+      {
+        "turn": 4,
+        "prompt": "Summarize the audit findings in a clear table report.",
+        "toolsKept": 7,
+        "toolsPruned": 43,
+        "sectionsKept": 2,
+        "sectionsPruned": 7,
+        "baselineTokens": 18036,
+        "actualTokens": 2420,
+        "savedTokens": 15616,
+        "reductionPct": "86.6",
+        "hookMs": 580
+      }
+    ],
+    "totalBaseline": 72144,
+    "totalActual": 10741,
+    "totalSaved": 61403,
+    "overallReduction": "85.1"
+  }
+}
