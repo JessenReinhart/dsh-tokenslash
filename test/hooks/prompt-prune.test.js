@@ -209,8 +209,10 @@ test("promptPruneHook extreme mode with pure reasoning query drops all tools", a
 
   const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
   assert.equal(res.tools.length, 0);
-  assert.equal(res.sections.length, 1);
-  assert.equal(res.sections[0].name, "persona");
+  const sectionNames = res.sections.map((s) => s.name);
+  assert.ok(sectionNames.includes("persona"));
+  assert.ok(sectionNames.includes("tokenslash-pruned-tools"));
+  assert.ok(!sectionNames.includes("free-search"));
 });
 
 test("promptPruneHook off mode leaves all tools and sections intact", async () => {

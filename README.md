@@ -90,19 +90,34 @@ TokenSlash works out of the box with safe defaults. Customize settings under **S
 ### 1. Smart System Prompt & Tool Pruning
 Hooks into DSH's `system-prompt/assemble` lifecycle. Analyzes the incoming prompt, strips unused tool JSON schemas and non-essential documentation sections, and caches the result for the turn.
 
-### 2. Multi-Turn Mask Inheritance
+When tools are pruned, TokenSlash automatically injects a Pruning Notice (`tokenslash-pruned-tools`) into the system prompt listing the pruned tools. This lets the LLM know which tools were stripped and reminds it that pruned tools can be inspected or unlocked on demand via `tokenslash_peek`.
+
+### 2. Dynamic Tool Unlocking & Inspection via `tokenslash_peek`
+TokenSlash registers `tokenslash_peek` as a core built-in tool that survives all pruning passes. If the agent discovers it needs a pruned tool mid-turn, it can invoke `tokenslash_peek` without breaking workflow:
+- **`action: "inspect"`**: Retrieve full schemas and descriptions of specified tools.
+- **`action: "unlock"`**: Mark specified tools as unlocked for the agent's turn so they bypass pruning on subsequent assembly passes.
+
+### 3. Multi-Turn Mask Inheritance
 When you say "continue", "resume", or give a brief instruction, TokenSlash detects the continuation and retains the tool mask from the prior turn so your agent never loses its active tools midway through a task.
 
-### 3. Subagent Model Tiering
+### 4. Subagent Model Tiering
 Routes subagent delegations based on task complexity. Sends simple file lookups to fast/cheap tiers (`deepseek-chat`, `gemini-2.5-flash`) while saving smart models (`deepseek-reasoner`, `claude-3-7-sonnet`) for deep architectural reasoning.
 
-### 4. Tool Output Pruning & Compaction
+### 5. Tool Output Pruning & Compaction
 When tools return massive payloads (>10KB JSON or huge diffs), TokenSlash condenses the result to essentials so history doesn't bloat your context window.
 
 ---
 
-## API & Telemetry
+## API & Tool Surface
 
+### Cordis Tools Registered
+- **`tokenslash_triage`**: Run custom Jev triage queries against the configured endpoint.
+- **`tokenslash_peek`**: Dynamic inspection and unlocking tool for pruned tools.
+  - Parameters:
+    - `action`: `"inspect" | "unlock"` (required)
+    - `tools`: `string[]` (list of tool names, required)
+
+### REST Endpoints
 TokenSlash exposes local endpoints for stats and external triage:
 
 - `GET /api/dsh-tokenslash/stats` — View total tokens saved, USD saved, and prune counts.
@@ -134,7 +149,7 @@ Live telemetry sample:
 npm test
 ```
 
-All 67 test suites run without external dependencies or live network access.
+All 71 test suites run without external dependencies or live network access.
 
 ## License
 
