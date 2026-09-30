@@ -451,6 +451,14 @@ export default function SettingsCard({
               </span>
               <span className="ts-stat-label">Outputs Compacted</span>
             </div>
+            <div className="ts-stat-card">
+              <span className="ts-stat-value" style={{ textTransform: "uppercase" }}>
+                {activeStats?.tokenizerMode ?? "N/A"}
+              </span>
+              <span className="ts-stat-label">
+                Tokenizer Mode {activeStats?.bpeEventCount != null ? `(${activeStats.bpeEventCount} BPE / ${activeStats.fallbackEventCount ?? 0} Fallback)` : ""}
+              </span>
+            </div>
           </div>
         </div>
       </div>

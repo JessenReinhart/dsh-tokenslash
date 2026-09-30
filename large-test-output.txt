@@ -1,0 +1,5 @@
+LOREM_START
+LOREM ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+LOREM ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+LOREM_PLACEHOLDER_LINE_THAT_IS_VERY_LONG_TO_FORCE_LARGE_OUTPUT_IN_ORDER_TO_TEST_THE_PRUNE_HOOK_BEHAVIOR_WITH_MORE_THAN_TEN_THOUSAND_CHARACTERS_SO_WE_CAN_VERIFY_THE_OUTPUTS_COMPACTED_COUNTER_INCREMENTS_CORRECTLY
+END

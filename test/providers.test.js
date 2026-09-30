@@ -33,8 +33,18 @@ test("listProviders returns entries", () => {
   const list = listProviders();
   assert.ok(Array.isArray(list));
   assert.ok(list.some((p) => p.id === "typesafe"));
+  assert.ok(list.some((p) => p.id === "localjev"));
   assert.ok(list.some((p) => p.id === "custom"));
   assert.equal(list.length, Object.keys(JEV_PROVIDERS).length);
+});
+
+test("getProviderConfig returns correct config for localjev", () => {
+  const cfg = getProviderConfig("localjev");
+  assert.equal(cfg.id, "localjev");
+  assert.equal(cfg.provider, "localjev");
+  assert.equal(cfg.baseUrl, "http://127.0.0.1:8080/v1/systemone");
+  assert.equal(cfg.model, "diffusiongemma-26B-A4B-it-4bit");
+  assert.equal(cfg.needsAuth, false);
 });
 
 test("fetchModels caches and normalizes", async () => {

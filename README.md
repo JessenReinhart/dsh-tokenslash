@@ -78,7 +78,7 @@ TokenSlash works out of the box with safe defaults. Customize settings under **S
 |---|---|---|
 | `enabled` | `true` | Turn TokenSlash on or off globally |
 | `toolPruningMode` | `"normal"` | Pruning aggressiveness (`"normal"`, `"extreme"`, or `"off"`) |
-| `provider` | `"opencode"` | Triage provider (`opencode`, `9router`, `openrouter`, `typesafe`, `custom`) |
+| `provider` | `"opencode"` | Triage provider (`opencode`, `9router`, `openrouter`, `typesafe`, `localjev`, `custom`) |
 | `customBaseUrl` | `http://127.0.0.1:20128/v1/systemone` | Endpoint for 9Router or custom proxy |
 | `pinnedTools` | `[]` | List of tool names you never want pruned (e.g. `["pwsh", "read"]`) |
 | `failOpen` | `true` | If triage endpoint goes down, keep all tools safe instead of failing |
@@ -105,6 +105,31 @@ Routes subagent delegations based on task complexity. Sends simple file lookups 
 
 ### 5. Tool Output Pruning & Compaction
 When tools return massive payloads (>10KB JSON or huge diffs), TokenSlash condenses the result to essentials so history doesn't bloat your context window.
+
+---
+
+## LocalJev Provider Setup
+
+TokenSlash supports `localjev` ([githubnext/localjev](https://github.com/githubnext/localjev)) as first-class local-only triage provider.
+
+### What is LocalJev?
+LocalJev is lightweight local server implementation of Jev triage protocol designed for low-latency, zero-cost on-device execution.
+
+### How to Run
+Install and start LocalJev with Bun, backed by local runtime like oMLX or upstream OpenAI-compatible model:
+
+```bash
+bun add -g localjev
+localjev --upstream http://127.0.0.1:8000/v1 --port 8080
+```
+
+LocalJev default triage endpoint: `http://127.0.0.1:8080/v1/systemone` with model `diffusiongemma-26B-A4B-it-4bit`.
+
+### Key Benefits
+- **0 network latency:** Triage decisions resolve locally on loopback.
+- **0 external data egress:** Prompts and tool schemas stay on device.
+- **0 cost:** Local inference burns $0 USD API budget.
+- **SOC2 compliant:** Fits strict enterprise data boundaries.
 
 ---
 

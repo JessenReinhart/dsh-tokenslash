@@ -37,5 +37,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/JessenReinhart/dsh-tokenslash.git"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "4.0.0"
   }
 }

@@ -78,3 +78,42 @@ test("toJSON/fromJSON roundtrip", () => {
   assert.equal(restored.history.length, 1);
   assert.equal(TokenslashTelemetry.fromJSON(null).history.length, 0);
 });
+
+test("history entry defaults token fields to null when absent", () => {
+  const t = new TokenslashTelemetry();
+  t.record("tool_prune", 100);
+  assert.equal(t.history[0].originalTokens, null);
+  assert.equal(t.history[0].compactedTokens, null);
+  assert.equal(t.history[0].tokenizerMode, null);
+});
+
+test("history entry stores token provenance and increments mode counters", () => {
+  const t = new TokenslashTelemetry();
+  t.recordOutputCompact(50, {
+    toolName: "read",
+    originalTokens: 120,
+    compactedTokens: 70,
+    tokenizerMode: "bpe",
+  });
+  assert.equal(t.history[0].originalTokens, 120);
+  assert.equal(t.history[0].compactedTokens, 70);
+  assert.equal(t.history[0].tokenizerMode, "bpe");
+  assert.equal(t.bpeEvents, 1);
+  assert.equal(t.fallbackEvents, 0);
+
+  const stats = t.getStats();
+  assert.equal(stats.tokenizerMode, "bpe");
+  assert.equal(stats.bpeEventCount, 1);
+  assert.equal(stats.fallbackEventCount, 0);
+});
+
+test("getStats reports mixed tokenizerMode when both modes recorded", () => {
+  const t = new TokenslashTelemetry();
+  t.recordOutputCompact(50, { tokenizerMode: "bpe" });
+  t.recordOutputCompact(30, { tokenizerMode: "fallback" });
+
+  const stats = t.getStats();
+  assert.equal(stats.tokenizerMode, "mixed");
+  assert.equal(stats.bpeEventCount, 1);
+  assert.equal(stats.fallbackEventCount, 1);
+});

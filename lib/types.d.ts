@@ -62,6 +62,9 @@ export interface TriageResult extends TriageDecision {
 export interface TelemetryEntry {
   type: string;
   savedTokens: number;
+  originalTokens?: number | null;
+  compactedTokens?: number | null;
+  tokenizerMode?: string | null;
   timestamp: number;
   [key: string]: unknown;
 }
@@ -71,14 +74,21 @@ export interface TelemetryStats {
   estimatedCostSavedUsd: string;
   subagentsDecoupledCount: number;
   toolsPrunedCount: number;
+  promptsPrunedCount?: number;
   outputsCompactedCount: number;
+  lastPruneEvent?: unknown;
+  tokenizerMode?: string | null;
+  bpeEventCount?: number;
+  fallbackEventCount?: number;
 }
 
 export interface TokenslashTelemetryInstance {
   record(action: string, tokens?: number, metadata?: Record<string, unknown>): void;
   recordSubagentDecouple(savedTokens?: number, metadata?: Record<string, unknown>): void;
   recordToolPrune(savedTokens?: number, metadata?: Record<string, unknown>): void;
+  recordPromptPrune(savedTokens?: number, metadata?: Record<string, unknown>): void;
   recordOutputCompact(savedTokens?: number, metadata?: Record<string, unknown>): void;
+  setLastPruneEvent(evt: unknown): void;
   reset(): void;
   getStats(): TelemetryStats;
   getHistory(limit?: number): TelemetryEntry[];
