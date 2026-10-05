@@ -53,20 +53,33 @@ Choose the mode that fits your style in the settings:
 
 ## Installation
 
-### Method 1: DSH Plugin Manager (Recommended)
+### Method 1: Automated Installer (Recommended)
 
-```bash
-dsh plugin add github:JessenReinhart/dsh-tokenslash
-```
+Clone and run the installer script. It adds the dependency to your profile, pulls hoisted dependencies (like `gpt-tokenizer`), and registers the bundle in `dsh.profile.bundles`:
 
-### Method 2: Manual Clone
-
-Clone into your profile packages folder:
 ```bash
 git clone https://github.com/JessenReinhart/dsh-tokenslash.git ~/.dsh/profiles/desktop/packages/dsh-tokenslash
+node ~/.dsh/profiles/desktop/packages/dsh-tokenslash/scripts/install.mjs
 ```
 
-Restart DSH Desktop or hit `Ctrl + R` to reload the UI. TokenSlash will appear in your plugin settings.
+Options:
+```bash
+node scripts/install.mjs --profile desktop        # target desktop (default)
+node scripts/install.mjs --profile web            # target another profile
+node scripts/install.mjs --dry-run                # preview changes without writing
+```
+
+### Method 2: From npm (once published)
+
+```bash
+# via the installer:
+node scripts/install.mjs --from npm
+
+# or via DSH CLI (web/acp/headless profiles):
+dsh plugin --profile web add dsh-tokenslash
+```
+
+After installing, reload DSH Desktop (`Ctrl + R` / `F5`) or restart the app. TokenSlash will appear under **Settings → TokenSlash**.
 
 ---
 

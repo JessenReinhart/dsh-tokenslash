@@ -10,6 +10,7 @@ test("plugin contract: exports required Cordis metadata", () => {
   assert.ok(plugin.inject.includes("tools"), "inject must declare 'tools'");
   assert.ok(plugin.inject.includes("webServer"), "inject must declare 'webServer'");
   assert.ok(plugin.inject.includes("settings"), "inject must declare 'settings'");
+  assert.ok(plugin.inject.includes("llm"), "inject must declare 'llm'");
   assert.equal(typeof plugin.apply, "function", "plugin must export 'apply' function");
   assert.equal(typeof plugin.Config, "function", "plugin must export 'Config' schema");
 });
@@ -59,9 +60,19 @@ test("plugin lifecycle: loads cleanly in Cordis context with mock services", asy
     }
   }
 
+  class LlmSvc extends Service {
+    constructor(c) {
+      super(c, "llm", true);
+    }
+    async *stream() {
+      yield "test";
+    }
+  }
+
   const tools = new ToolsSvc(ctx);
   const webServer = new WebServerSvc(ctx);
   const settings = new SettingsSvc(ctx);
+  const llm = new LlmSvc(ctx);
 
   // Apply plugin and await runtime settlement
   const fork = ctx.plugin(plugin, {});

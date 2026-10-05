@@ -94,6 +94,8 @@ test("interceptSubagentRequest routes when model is unspecified", async () => {
 
   await interceptSubagentRequest(request, "spawn", config, mockJev, null, null);
   assert.equal(request.agentOptions?.model, "gemini-2.5-flash");
+  assert.equal(request.agentOptions?.reasoningEffort, "off");
+  assert.equal(request.reasoning_effort, "off");
 });
 
 test("interceptSubagentRequest routes when model equals parent default model", async () => {
@@ -130,6 +132,43 @@ test("interceptSubagentRequest preserves custom explicit model", async () => {
 
   await interceptSubagentRequest(request, "spawn", config, mockJev, null, null);
   assert.equal(request.agentOptions?.model, "user-chosen-model");
+});
+
+test("interceptSubagentRequest disables thinking when explicit model is in cheap tier", async () => {
+  const config = {
+    modelTiers: { cheap: "gemini-2.5-flash, deepseek-chat" },
+  };
+  const request = {
+    label: "explicit cheap",
+    prompt: [{ type: "text", text: "quick summary" }],
+    parent: { options: { model: "parent-model" } },
+    agentOptions: { model: "deepseek-chat" },
+  };
+
+  await interceptSubagentRequest(request, "spawn", config, null, null, null);
+  assert.equal(request.agentOptions?.model, "deepseek-chat");
+  assert.equal(request.agentOptions?.reasoningEffort, "off");
+  assert.equal(request.reasoning_effort, "off");
+});
+
+test("interceptSubagentRequest respects disableCheapThinking: false", async () => {
+  const mockJev = {
+    triage: async () => ({ tier: "cheap" }),
+  };
+  const config = {
+    disableCheapThinking: false,
+    modelTiers: { cheap: "gemini-2.5-flash" },
+  };
+  const request = {
+    label: "fast search",
+    prompt: [{ type: "text", text: "quick lookup" }],
+    parent: { options: { model: "claude-3-7-sonnet" } },
+  };
+
+  await interceptSubagentRequest(request, "spawn", config, mockJev, null, null);
+  assert.equal(request.agentOptions?.model, "gemini-2.5-flash");
+  assert.equal(request.agentOptions?.reasoningEffort, undefined);
+  assert.equal(request.reasoning_effort, undefined);
 });
 
 test("attachSubagentRouting monkey-patches startContinuable and start", async () => {

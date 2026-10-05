@@ -1,8 +1,15 @@
 {
   "name": "dsh-tokenslash",
   "version": "1.0.0",
-  "private": true,
   "description": "TypeSafe Jev token optimization suite for DeepSeek Harness (DSH): Subagent Router, Fork Decoupler, Tool Schema Pruner, Output Compactor, and Settings UI",
+  "keywords": [
+    "dsh-plugin",
+    "cordis",
+    "deepseek-harness",
+    "prompt-pruning",
+    "token-optimization",
+    "subagent-routing"
+  ],
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -14,7 +21,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "prepublishOnly": "node --test",
+    "install:profile": "node scripts/install.mjs",
+    "publish:npm": "node scripts/publish.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dsh": {
     "bundle": {
@@ -29,6 +42,7 @@
   },
   "files": [
     "lib",
+    "scripts",
     "cordis.patch.yml",
     "package.json",
     "README.md"
@@ -36,7 +50,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JessenReinhart/dsh-tokenslash.git"
+    "url": "git+https://github.com/JessenReinhart/dsh-tokenslash.git"
   },
   "dependencies": {
     "gpt-tokenizer": "4.0.0"

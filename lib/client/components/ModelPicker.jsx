@@ -2,7 +2,7 @@ import React from "react";
 import { fetchModels } from "../api.js";
 
 const DEFAULT_TIERS = [
-  { key: "cheap", label: "Cheap", color: "#3fb950", badge: "Fast", hint: "Simple, highly bounded tasks" },
+  { key: "cheap", label: "Cheap", color: "#3fb950", badge: "Fast", hint: "Simple, highly bounded tasks (thinking disabled)" },
   { key: "medium", label: "Medium", color: "#58a6ff", badge: "Balanced", hint: "Moderate reasoning, balanced cost" },
   { key: "smart", label: "Smart", color: "#bc8cff", badge: "Deep", hint: "Complex context, high-end reasoning" },
 ];
