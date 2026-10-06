@@ -1,6 +1,11 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { executeBatch, MAX_BATCH_CALLS } from "../../lib/tools/batch.js";
+import {
+  executeBatch,
+  MAX_BATCH_CALLS,
+  normalizeToolName,
+  normalizeBatchCall,
+} from "../../lib/tools/batch.js";
 
 function makeCtx(tools) {
   return {
@@ -93,5 +98,50 @@ describe("tokenslash_batch", () => {
     const res = await executeBatch([{ tool: "nonexistent", args: {} }], ctx);
     assert.equal(res.failed, 1);
     assert.match(res.results[0].error, /not found/);
+  });
+
+  test("strips namespaces and handles function-calling aliases", async () => {
+    assert.equal(normalizeToolName("functions.pwsh"), "pwsh");
+    assert.equal(normalizeToolName("default_api:skill"), "skill");
+    assert.equal(normalizeToolName("tools.read"), "read");
+    assert.equal(normalizeToolName("functions:grep"), "grep");
+    assert.equal(normalizeToolName("  pwsh  "), "pwsh");
+
+    const norm1 = normalizeBatchCall({ name: "functions.pwsh", arguments: '{"command":"ls"}' });
+    assert.equal(norm1.tool, "pwsh");
+    assert.deepEqual(norm1.args, { command: "ls" });
+
+    const norm2 = normalizeBatchCall({ function: { name: "default_api:skill", arguments: { name: "test" } } });
+    assert.equal(norm2.tool, "skill");
+    assert.deepEqual(norm2.args, { name: "test" });
+  });
+
+  test("resolves tools using agent scope when present", async () => {
+    const scopedTools = {
+      skill: { execute: async (args) => `skill:${args.name}` },
+    };
+    const ctx = {
+      tools: {
+        get: (name, scope) => {
+          if (scope && scope.id === "agent-active") {
+            return scopedTools[name] || null;
+          }
+          return null; // not in global view
+        },
+      },
+    };
+
+    const res = await executeBatch(
+      [
+        { tool: "functions.skill", args: { name: "tokenslash-workflow" } },
+      ],
+      ctx,
+      { agent: { id: "agent-active" } }
+    );
+
+    assert.equal(res.count, 1);
+    assert.equal(res.successful, 1);
+    assert.equal(res.results[0].tool, "skill");
+    assert.equal(res.results[0].result, "skill:tokenslash-workflow");
   });
 });
