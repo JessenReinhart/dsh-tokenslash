@@ -8,6 +8,7 @@ import {
   hasUnfinishedAssistantIntent,
   detectResumeSignal,
   detectRequiredGroupsViaJev,
+  injectToolGuidance,
   TOOL_GROUPS,
   CORE_TOOLS,
 } from "../../lib/hooks/prompt-prune.js";
@@ -422,4 +423,21 @@ test("FIFO eviction keeps lastActiveGroups bounded to 100 entries", async () => 
   for (let i = 0; i < 105; i++) {
     await hook(assembly, { agent: { id: `agent-${i}` }, inbox: { nextStep: [{ content: `Search web ${i}` }] } }, () => Promise.resolve(assembly));
   }
+});
+
+test("injectToolGuidance patches read section with index/batch directives", () => {
+  const sections = [
+    { name: "tool:read", text: "Use the read tool — not shell commands like cat — to inspect text files. Results include line numbers." },
+    { name: "persona", text: "You are a coding agent." },
+  ];
+  const out = injectToolGuidance(sections);
+  assert.ok(out[0].text.includes("tokenslash_index"));
+  assert.ok(out[0].text.includes("tokenslash_batch"));
+  assert.equal(out[1].text, "You are a coding agent.");
+});
+
+test("injectToolGuidance leaves non-read sections untouched", () => {
+  const sections = [{ name: "tool:write", text: "Use the write tool to create files." }];
+  const out = injectToolGuidance(sections);
+  assert.equal(out[0].text, "Use the write tool to create files.");
 });
