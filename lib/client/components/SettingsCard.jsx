@@ -24,6 +24,7 @@ export default function SettingsCard({
     apiKey: "",
     model: "deepseek-chat",
     decoupleThreshold: 0.6,
+    outputCompactLimit: 4000,
     modelTiers: { cheap: "", medium: "", smart: "" },
     pinnedTools: [],
     failOpen: true,

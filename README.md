@@ -20,6 +20,9 @@ Over a 10-turn coding session, you burn **180,000+ tokens** just telling the LLM
 - 🧠 **Context-Aware Continuity:** "continue", "resume", or follow-up prompts automatically inherit your active tool set.
 - ⚡ **Sub-Second Triage:** Jev triage takes ~500ms over local proxy, with built-in fail-open safety (if triage fails, nothing is dropped).
 - 💰 **Subagent Model Tiering:** Automatically routes lightweight subagent tasks to cheaper models (`gemini-2.5-flash`, `deepseek-chat`).
+- 🦴 **`tokenslash_index`:** Tree-sitter-style file skeleton tool (imports, classes, functions, line ranges `[start-end]`) — 70–90% smaller than full `read`, call it first and read only what you need (inspired by [Maki](https://maki.sh/docs/token-economy/)).
+- 📦 **`tokenslash_batch`:** Run up to 15 independent tool calls in a single turn, collapsing multi-round-trip exploration into one context send.
+- ✂️ **Tighter Output Compaction:** Default tool-output compaction limit lowered from 10,000 → 4,000 chars (configurable via `outputCompactLimit`).
 
 ---
 

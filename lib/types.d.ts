@@ -38,6 +38,7 @@ export interface Config {
   apiKey: string;
   model: string;
   decoupleThreshold: number;
+  outputCompactLimit?: number;
   modelTiers: ModelTiers;
   pinnedTools?: string[];
   failOpen?: boolean;
