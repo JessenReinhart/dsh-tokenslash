@@ -112,6 +112,87 @@ describe("tokenslash_index", () => {
     assert.equal(res.symbols[3].kind, "h3");
   });
 
+  test("indexes a Lua file with requires, functions, methods, and tables", async () => {
+    const file = await writeTempFile(
+      "module.lua",
+      [
+        'local http = require("http")',
+        'local json = require "cjson"',
+        "",
+        "-- Single-line comment",
+        "--[[ Multi-line",
+        "     comment block --]]",
+        "",
+        "local Config = {",
+        "  timeout = 5000,",
+        "  retries = 3,",
+        "}",
+        "",
+        "local function helper(x, y)",
+        "  if x > y then",
+        "    return x",
+        "  end",
+        "  return y",
+        "end",
+        "",
+        "function Config.new(opts)",
+        "  local self = {}",
+        "  return setmetatable(self, { __index = Config })",
+        "end",
+        "",
+        "function Config:run(task)",
+        "  for i = 1, 10 do",
+        "    print(i)",
+        "  end",
+        "  return true",
+        "end",
+        "",
+        "local anonymous = function(a)",
+        "  return a * 2",
+        "end",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file);
+    assert.equal(res.language, "lua");
+    assert.equal(res.lines, 34);
+    assert.ok(res.symbolsCount >= 5);
+
+    const reqSym = res.symbols.find((s) => s.kind === "requires");
+    assert.ok(reqSym, "requires symbol found");
+    assert.equal(reqSym.start, 1);
+    assert.equal(reqSym.end, 2);
+
+    const tableSym = res.symbols.find((s) => s.kind === "table");
+    assert.ok(tableSym, "table symbol found");
+    assert.match(tableSym.signature, /local Config =/);
+    assert.equal(tableSym.start, 8);
+    assert.equal(tableSym.end, 11);
+
+    const helperSym = res.symbols.find((s) => s.signature.includes("function helper"));
+    assert.ok(helperSym, "helper function found");
+    assert.equal(helperSym.kind, "function");
+    assert.equal(helperSym.start, 13);
+    assert.equal(helperSym.end, 18);
+
+    const methodDotSym = res.symbols.find((s) => s.signature.includes("Config.new"));
+    assert.ok(methodDotSym, "Config.new method found");
+    assert.equal(methodDotSym.kind, "method");
+    assert.equal(methodDotSym.start, 20);
+    assert.equal(methodDotSym.end, 23);
+
+    const methodColonSym = res.symbols.find((s) => s.signature.includes("Config:run"));
+    assert.ok(methodColonSym, "Config:run method found");
+    assert.equal(methodColonSym.kind, "method");
+    assert.equal(methodColonSym.start, 25);
+    assert.equal(methodColonSym.end, 30);
+
+    const anonSym = res.symbols.find((s) => s.signature.includes("anonymous = function"));
+    assert.ok(anonSym, "anonymous function found");
+    assert.equal(anonSym.start, 32);
+    assert.equal(anonSym.end, 34);
+  });
+
   test("indexes directory listing", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "tokenslash-dir-"));
     await fs.writeFile(path.join(dir, "a.js"), "console.log(1)");
