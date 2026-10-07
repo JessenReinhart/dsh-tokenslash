@@ -193,6 +193,50 @@ describe("tokenslash_index", () => {
     assert.equal(anonSym.end, 34);
   });
 
+  test("indexes an HTML / Thymeleaf template with elements and inline scripts", async () => {
+    const file = await writeTempFile(
+      "template.html",
+      [
+        "<!DOCTYPE html>",
+        '<html xmlns:th="http://www.thymeleaf.org">',
+        "<head>",
+        "  <title>Test</title>",
+        "</head>",
+        "<body>",
+        '  <form id="iqryCond">',
+        '    <div id="gridWrapper">',
+        '      <div id="basic-grid"></div>',
+        "    </div>",
+        "  </form>",
+        '  <script th:inline="javascript">',
+        "    function fn_initBasicGrid() {",
+        "      console.log('init');",
+        "    }",
+        "    const fn_save = () => {",
+        "      return true;",
+        "    };",
+        "  </script>",
+        "</body>",
+        "</html>",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file);
+    assert.equal(res.language, "html");
+    assert.equal(res.lines, 21);
+    assert.ok(res.symbolsCount >= 4);
+
+    const elements = res.symbols.filter((s) => s.kind === "element");
+    assert.ok(elements.length >= 3, "should extract key elements by id");
+    assert.ok(elements.some((e) => e.signature.includes('id="iqryCond"')));
+    assert.ok(elements.some((e) => e.signature.includes('id="basic-grid"')));
+
+    const funcs = res.symbols.filter((s) => s.kind === "function");
+    assert.ok(funcs.length >= 2, "should extract functions inside inline script");
+    assert.ok(funcs.some((f) => f.signature.includes("fn_initBasicGrid")));
+    assert.ok(funcs.some((f) => f.signature.includes("fn_save")));
+  });
+
   test("indexes directory listing", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "tokenslash-dir-"));
     await fs.writeFile(path.join(dir, "a.js"), "console.log(1)");
