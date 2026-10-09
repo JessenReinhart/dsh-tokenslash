@@ -6,6 +6,10 @@
 //   - RC app (dsh-desktop 0.2.0-rc.2): `plugins.row.config`, keyed by
 //     `<package name>#<row id>` (rowConfigKey in @deepseek-ai/dsh-client-ui-plugin-manager),
 //     description falls back to the entry rendered with `view: 'summary'`.
+//   - RC app (dsh-desktop 0.2.0-rc.2): `settings.section`, list slot declared by
+//     @deepseek-ai/dsh-client-ui-settings-general. Options: id (required), order
+//     (optional number, default 0), label (string | () => string). This independent
+//     top-level entry keeps TokenSlash reachable when the host ships no Plugins section.
 // SlotRegistry.inject in both apps parks the factory until the slot is declared,
 // so injecting a slot the host lacks is a safe no-op (verified in
 // @deepseek-ai/dsh-client-ui-renderer SlotRegistry.inject in both installs).
@@ -98,12 +102,12 @@ test("apply is a safe no-op when the host has no slots service", () => {
   assert.equal(inject({}), undefined);
 });
 
-test("apply injects exactly the two host-verified slots", () => {
+test("apply injects exactly the three host-verified slots", () => {
   const host = createHost();
   apply(host.ctx);
   assert.deepEqual(
     host.injected.map((i) => i.name),
-    ["settings.plugin.item", "plugins.row.config"]
+    ["settings.plugin.item", "plugins.row.config", "settings.section"]
   );
 });
 
@@ -140,6 +144,27 @@ test("plugins.row.config (RC 0.2.0-rc.2): keyed <package>#<row id>, summary fall
 
   const element = reg.component({});
   assert.equal(element.$$reactElement, true);
+  assert.deepEqual(element.props, { page: true });
+});
+
+test("settings.section (RC 0.2.0-rc.2): independent list-slot page", () => {
+  const host = createHost();
+  apply(host.ctx);
+  const reg = materialize(host).get("settings.section");
+  assert.ok(reg, "settings.section registration missing");
+  assert.deepEqual(reg.options, {
+    name: "settings.section",
+    id: "dsh-tokenslash",
+    order: 60,
+    label: "TokenSlash",
+  });
+  assert.equal(typeof reg.options.id, "string");
+  assert.ok(reg.options.id.length > 0, "settings.section id is required (list slot rejects entries without one)");
+
+  // The section owns a full-page render; owner props (e.g. `close`) are ignored.
+  const element = reg.component({ close: () => {} });
+  assert.equal(element.$$reactElement, true);
+  assert.equal(typeof element.type, "function");
   assert.deepEqual(element.props, { page: true });
 });
 
