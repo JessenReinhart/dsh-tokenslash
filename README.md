@@ -1,5 +1,7 @@
 # dsh-tokenslash ⚡
 
+[![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/jessenreinhart/dsh-tokenslash)
+
 > **Cut up to 85% of prompt overhead in DeepSeek Harness.**  
 > Automatically prune unused tools, strip bloated system prompts, and route subagents to budget-friendly models — without breaking agent workflows.
 
