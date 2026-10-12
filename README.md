@@ -154,7 +154,7 @@ LocalJev default triage endpoint: `http://127.0.0.1:8080/v1/systemone` with mode
 ## API & Tool Surface
 
 ### Cordis Tools Registered
-- **`tokenslash_triage`**: Run custom Jev triage queries against the configured endpoint.
+- **`tokenslash_triage`**: Run structured micro-decisions (`noul` probability or `choice` classification) against the Jev endpoint. See [`docs/TRIAGE.md`](docs/TRIAGE.md).
 - **`tokenslash_peek`**: Dynamic inspection and unlocking tool for pruned tools.
   - Parameters:
     - `action`: `"inspect" | "unlock"` (required)

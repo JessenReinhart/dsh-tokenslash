@@ -8,6 +8,12 @@
 ## Crucial Rule: Node Modules Sync
 DSH Desktop loads plugins from `node_modules\dsh-tokenslash`, **not** from `packages\dsh-tokenslash`. `node_modules\dsh-tokenslash` is a directory copy, not a symlink.
 
+## TypeSafe Jev & `tokenslash_triage`
+See [docs/TRIAGE.md](docs/TRIAGE.md) for full documentation on TypeSafe Jev and proper `tokenslash_triage` tool invocation.
+- Jev is a fast, low-cost micro-decision engine, **not** a conversational model.
+- Only invoke `tokenslash_triage` for structured micro-decisions (tiering, probability checks via `type: "noul"`, or discrete classification via `type: "choice"`).
+- Never use it for code authoring, file inspection, or open-ended Q&A.
+
 ### Mandatory Workflow
 After making ANY changes (code, config, or assets) in `packages\dsh-tokenslash`:
 1. Ask the user explicitly if they want to sync changes to `node_modules`.
