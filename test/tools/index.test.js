@@ -237,6 +237,109 @@ describe("tokenslash_index", () => {
     assert.ok(funcs.some((f) => f.signature.includes("fn_save")));
   });
 
+  test("indexes a Java file with package, imports, class, methods, and constructor", async () => {
+    const file = await writeTempFile(
+      "UserService.java",
+      [
+        "package com.example.service;",
+        "",
+        "import java.util.List;",
+        "import java.util.Optional;",
+        "",
+        "public class UserService {",
+        "    private final UserRepository repo;",
+        "",
+        "    public UserService(UserRepository repo) {",
+        "        this.repo = repo;",
+        "    }",
+        "",
+        "    public Optional<User> findById(String id) {",
+        "        return repo.findById(id);",
+        "    }",
+        "",
+        "    public List<User> findAll() {",
+        "        return repo.findAll();",
+        "    }",
+        "}",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file);
+    assert.equal(res.language, "java");
+    assert.equal(res.lines, 20);
+    assert.ok(res.symbolsCount >= 5);
+
+    const pkg = res.symbols.find((s) => s.kind === "package");
+    assert.ok(pkg, "package symbol found");
+    assert.equal(pkg.signature, "package com.example.service;");
+
+    const imports = res.symbols.find((s) => s.kind === "imports");
+    assert.ok(imports, "imports found");
+    assert.equal(imports.start, 3);
+    assert.equal(imports.end, 4);
+
+    const cls = res.symbols.find((s) => s.kind === "class");
+    assert.ok(cls, "class found");
+    assert.match(cls.signature, /public class UserService/);
+
+    const ctor = res.symbols.find((s) => s.kind === "constructor");
+    assert.ok(ctor, "constructor found");
+    assert.match(ctor.signature, /UserService\(UserRepository repo\)/);
+
+    const methods = res.symbols.filter((s) => s.kind === "method");
+    assert.equal(methods.length, 2, "methods found");
+    assert.ok(methods.some((m) => m.signature.includes("findById")));
+    assert.ok(methods.some((m) => m.signature.includes("findAll")));
+  });
+
+  test("indexes Java interface, record, enum, and annotations", async () => {
+    const file = await writeTempFile(
+      "Types.java",
+      [
+        "package com.example.model;",
+        "",
+        "public interface UserContract {",
+        "    void execute();",
+        "}",
+        "",
+        "public record UserDto(String id, String name) {",
+        "    public String format() {",
+        "        return id + \":\" + name;",
+        "    }",
+        "}",
+        "",
+        "public enum Status {",
+        "    ACTIVE, INACTIVE;",
+        "    public boolean isActive() {",
+        "        return this == ACTIVE;",
+        "    }",
+        "}",
+        "",
+        "public @interface Validated {",
+        "    String value() default \"\";",
+        "}",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file);
+    assert.equal(res.language, "java");
+
+    const iface = res.symbols.find((s) => s.kind === "interface");
+    assert.ok(iface, "interface found");
+
+    const record = res.symbols.find((s) => s.kind === "record");
+    assert.ok(record, "record found");
+
+    const enumSym = res.symbols.find((s) => s.kind === "enum");
+    assert.ok(enumSym, "enum found");
+
+    const annot = res.symbols.find((s) => s.kind === "annotation");
+    assert.ok(annot, "annotation found");
+
+    const methods = res.symbols.filter((s) => s.kind === "method");
+    assert.ok(methods.length >= 2, "methods inside types found");
+  });
+
   test("indexes directory listing", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "tokenslash-dir-"));
     await fs.writeFile(path.join(dir, "a.js"), "console.log(1)");
