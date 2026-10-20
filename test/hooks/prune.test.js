@@ -1,7 +1,7 @@
 // test/hooks/prune.test.js
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPruneHook } from "../../lib/hooks/prune.js";
+import { createPruneHook, distillOutput } from "../../lib/hooks/prune.js";
 import { TokenslashTelemetry } from "../../lib/telemetry.js";
 
 const enabledConfig = { enabled: true, modules: { outputCompacting: true }, toolPruningMode: "extreme" };
@@ -152,4 +152,73 @@ test("pruneHook: passes result through unchanged when nativeToolResultPruner is 
   const res = await hook({ name: "bash" }, largeResult, undefined);
   assert.equal(res, largeResult);
 });
+
+test("distillOutput: strips ANSI escape sequences", () => {
+  const input = "\x1b[32mSUCCESS\x1b[0m: Process completed \x1b[1;34mcleanly\x1b[0m\x1b]0;Title\x07";
+  const distilled = distillOutput(input);
+  assert.equal(distilled, "SUCCESS: Process completed cleanly");
+});
+
+test("distillOutput: resolves carriage-return overwrite lines", () => {
+  const input = "Downloading: 10%\rDownloading: 50%\rDownloading: 100%\nDone.";
+  const distilled = distillOutput(input);
+  assert.equal(distilled, "Downloading: 100%\nDone.");
+});
+
+test("distillOutput: collapses 3+ repeated identical lines", () => {
+  const input = ["warning: deprecated API", "warning: deprecated API", "warning: deprecated API", "warning: deprecated API"].join("\n");
+  const distilled = distillOutput(input);
+  assert.ok(distilled.includes("warning: deprecated API"));
+  assert.ok(distilled.includes("[... repeated 3 more times]"));
+});
+
+test("distillOutput: collapses 5+ similar lines", () => {
+  const input = [
+    "  PASS  test/a.test.js",
+    "  PASS  test/b.test.js",
+    "  PASS  test/c.test.js",
+    "  PASS  test/d.test.js",
+    "  PASS  test/e.test.js",
+  ].join("\n");
+  const distilled = distillOutput(input);
+  assert.ok(distilled.includes("test/a.test.js"));
+  assert.ok(distilled.includes("test/b.test.js"));
+  assert.ok(distilled.includes("similar lines omitted"));
+  assert.ok(distilled.includes("test/e.test.js"));
+});
+
+test("distillOutput: collapses 3+ consecutive blank lines to 2", () => {
+  const input = "start\n\n\n\n\nend";
+  const distilled = distillOutput(input);
+  assert.equal(distilled, "start\n\n\nend");
+});
+
+test("pruneHook: short outputs (< 500 chars) bypass distillation", async () => {
+  const hook = createPruneHook({}, {}, () => enabledConfig);
+  const shortAnsi = "\x1b[31mError\x1b[0m"; // < 500 chars
+  const res = await hook({ name: "bash" }, shortAnsi);
+  assert.equal(res, shortAnsi); // untouched because length < 500
+});
+
+test("pruneHook: distillation + truncation pipeline works end-to-end", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const hook = createPruneHook(mockLLMCtx("compact summary"), {}, () => enabledConfig, telemetry);
+  // Large output with ANSI codes and repetition > 500 chars
+  const noise = "\x1b[32m  PASS  test/suite.test.js\x1b[0m\n".repeat(200);
+  const res = await hook({ name: "bash" }, noise);
+  // Distillation successfully collapses the 7KB repeated noise down below compactLimit
+  assert.equal(typeof res, "string");
+  assert.ok(res.includes("[... repeated 199 more times]"));
+  assert.ok(!res.includes("\x1b[32m"));
+
+  // When input is still > compactLimit even after distillation, LLM compaction triggers
+  const hugeUncollapsible = "\x1b[33mWarning\x1b[0m: " + "a".repeat(100) + "\n";
+  const uniqueLines = Array.from({ length: 80 }, (_, i) => `${hugeUncollapsible} unique line ${i}`).join("\n");
+  const compacted = await hook({ name: "bash" }, uniqueLines);
+  assert.ok(Array.isArray(compacted));
+  assert.equal(compacted[0].type, "text");
+  assert.equal(compacted[0].text, "compact summary");
+  assert.equal(telemetry.outputsCompactedCount, 1);
+});
+
 

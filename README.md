@@ -27,6 +27,9 @@ Over a 10-turn coding session, you burn **180,000+ tokens** just telling the LLM
 - 👁️ **PTC Mode Aware `tokenslash_peek`:** Detects DSH Programmatic Tool Calling (`ptc`) mode and returns concise signatures instead of verbose JSON schemas.
 - 📊 **Native TokenMeter Integration:** Attaches to native DSH 0.2.x `ctx.tokenMeter` for BPE-precise token savings telemetry.
 - ✂️ **Tighter Output Compaction:** Default tool-output compaction limit lowered from 10,000 → 4,000 chars (configurable via `outputCompactLimit`).
+- 🧹 **Deterministic Output Distillation:** Strips ANSI color escapes, `\r` progress-bar overwrites, npm/yarn/pnpm noise, and collapses repetitive test/warning lines *before* they hit the model — pure regex, zero LLM calls, sub-millisecond.
+- 🗂️ **Observation Masking:** Turns old tool outputs (>2 turns ago, >800 chars) into compact stubs so settled context stops draining tokens every turn, while preserving `tool_call_id` + role structure.
+- 🔁 **Canonical Prefix-Cache Alignment:** Sorts surviving tool schemas and prompt sections deterministically every turn, keeping the provider's prompt prefix byte-identical for maximum cache hits and lower latency.
 
 ---
 
@@ -206,7 +209,7 @@ Live telemetry sample:
 npm test
 ```
 
-All 195 unit tests run via `node --test` without external dependencies or live network access.
+All 223 unit tests run via `node --test` without external dependencies or live network access.
 
 ## License
 

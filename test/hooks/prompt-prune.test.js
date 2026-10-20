@@ -9,6 +9,8 @@ import {
   detectResumeSignal,
   detectRequiredGroupsViaJev,
   injectToolGuidance,
+  stableSortTools,
+  stableSortSections,
   TOOL_GROUPS,
   CORE_TOOLS,
 } from "../../lib/hooks/prompt-prune.js";
@@ -440,4 +442,113 @@ test("injectToolGuidance leaves non-read sections untouched", () => {
   const sections = [{ name: "tool:write", text: "Use the write tool to create files." }];
   const out = injectToolGuidance(sections);
   assert.equal(out[0].text, "Use the write tool to create files.");
+});
+
+test("stableSortTools sorts tool schemas canonically by name", () => {
+  const tools = [
+    { name: "write" },
+    { name: "read" },
+    { name: "web_search" },
+    { name: "glob" },
+    "ask_user_question",
+    { name: "grep" },
+  ];
+  const out = stableSortTools(tools);
+  const names = out.map((t) => (typeof t === "string" ? t : t.name));
+  assert.deepEqual(names, ["ask_user_question", "glob", "grep", "read", "web_search", "write"]);
+});
+
+test("stableSortSections sorts sections canonically by order then name", () => {
+  const sections = [
+    { name: "zeta", order: 10 },
+    { name: "alpha", order: 5 },
+    { name: "beta", order: 5 },
+    { name: "persona" },
+    { name: "misc" },
+    { name: "system", order: -10 },
+  ];
+  const out = stableSortSections(sections);
+  const names = out.map((s) => s.name);
+  // -10 first, then 0 (misc before persona by name), then 5 (alpha before beta), then 10 (zeta)
+  assert.deepEqual(names, ["system", "misc", "persona", "alpha", "beta", "zeta"]);
+});
+
+test("promptPruneHook sorts surviving tools and sections canonically with prefixCacheAlignment", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const config = { enabled: true, modules: { promptPruning: true, prefixCacheAlignment: true } };
+  const hook = createPromptPruneHook({}, {}, () => config, telemetry);
+
+  const mockAgent = {
+    inbox: {
+      hasPending: true,
+      nextStep: [{ content: "Count lines in package.json" }],
+    },
+  };
+
+  const assembly = {
+    tools: [
+      { name: "write" },
+      { name: "read" },
+      { name: "generate_image" },
+      { name: "web_search" },
+    ],
+    sections: [
+      { name: "zeta", text: "z", order: 10 },
+      { name: "alpha", text: "a", order: 5 },
+      { name: "system", text: "sys", order: -10 },
+      { name: "free-search", text: "Search engines" },
+    ],
+  };
+
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  const toolNames = res.tools.map((t) => t.name);
+  // canonical alphabetical order of retained tools
+  assert.deepEqual(toolNames, ["read", "write"]);
+
+  const sectionNames = res.sections.map((s) => s.name);
+  // Pruned: free-search. Injected: tokenslash-pruned-tools (order 0).
+  // Retained sorted: system (-10), tokenslash-pruned-tools (0), alpha (5), zeta (10).
+  assert.deepEqual(sectionNames, ["system", "tokenslash-pruned-tools", "alpha", "zeta"]);
+});
+
+test("teams and schedule tool groups are defined with modern DSH tools", () => {
+  assert.deepEqual(TOOL_GROUPS.teams.tools, [
+    "wait_agent",
+    "spawn_teammate",
+    "team_task_create",
+    "team_task_get",
+    "team_task_list",
+    "team_task_update",
+  ]);
+  assert.deepEqual(TOOL_GROUPS.schedule.tools, [
+    "schedule_create",
+    "schedule_delete",
+    "schedule_list",
+    "schedule_update",
+  ]);
+  assert.ok(TOOL_GROUPS.shell.tools.includes("bash"));
+  assert.ok(TOOL_GROUPS.image.tools.includes("read_image"));
+  assert.ok(TOOL_GROUPS.file_ops.tools.includes("working_directory"));
+});
+
+test("teams group prunes when prompt has no team keywords and retains when it does", () => {
+  const noTeam = detectRequiredGroups("Calculate 2 plus 2");
+  assert.ok(!noTeam.has("teams"));
+
+  const team = detectRequiredGroups("Spawn a teammate to share a task on the task board");
+  assert.ok(team.has("teams"));
+});
+
+test("schedule group prunes when prompt has no schedule keywords and retains when it does", () => {
+  const noSchedule = detectRequiredGroups("Read file contents");
+  assert.ok(!noSchedule.has("schedule"));
+
+  const schedule = detectRequiredGroups("Remind me daily at 9am to run the cron job");
+  assert.ok(schedule.has("schedule"));
+});
+
+test("CORE_TOOLS includes essential control tools", () => {
+  for (const name of ["read", "write", "edit", "pwsh", "bash", "working_directory", "tokenslash_triage", "tokenslash_peek"]) {
+    assert.ok(CORE_TOOLS.has(name), `expected ${name} in CORE_TOOLS`);
+  }
 });
