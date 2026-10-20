@@ -70,6 +70,21 @@ export interface TelemetryEntry {
   [key: string]: unknown;
 }
 
+export interface TelemetryModuleBreakdown {
+  events: number;
+  tokens: number;
+}
+
+export interface TelemetryByModule {
+  toolPrune: TelemetryModuleBreakdown;
+  promptPrune: TelemetryModuleBreakdown;
+  outputCompact: TelemetryModuleBreakdown;
+  observationMask: TelemetryModuleBreakdown;
+  outputDistill: TelemetryModuleBreakdown;
+  subagentDecouple: TelemetryModuleBreakdown;
+  cacheAlignment: TelemetryModuleBreakdown;
+}
+
 export interface TelemetryStats {
   totalTokensSaved: number;
   estimatedCostSavedUsd: string;
@@ -77,6 +92,15 @@ export interface TelemetryStats {
   toolsPrunedCount: number;
   promptsPrunedCount?: number;
   outputsCompactedCount: number;
+  observationMaskCount: number;
+  observationMaskTokensSaved: number;
+  outputDistillCount: number;
+  outputDistillTokensSaved: number;
+  cacheAlignmentEvents: number;
+  sessionTurnsCount: number;
+  topPrunedTools: Record<string, number>;
+  byModule: TelemetryByModule;
+  avgTokensSavedPerTurn: number;
   lastPruneEvent?: unknown;
   tokenizerMode?: string | null;
   bpeEventCount?: number;
@@ -84,16 +108,27 @@ export interface TelemetryStats {
 }
 
 export interface TokenslashTelemetryInstance {
+  observationMaskCount: number;
+  observationMaskTokensSaved: number;
+  outputDistillCount: number;
+  outputDistillTokensSaved: number;
+  cacheAlignmentEvents: number;
+  sessionTurnsCount: number;
+  topPrunedTools: Record<string, number>;
+  readonly byModule: TelemetryByModule;
   record(action: string, tokens?: number, metadata?: Record<string, unknown>): void;
   recordSubagentDecouple(savedTokens?: number, metadata?: Record<string, unknown>): void;
   recordToolPrune(savedTokens?: number, metadata?: Record<string, unknown>): void;
   recordPromptPrune(savedTokens?: number, metadata?: Record<string, unknown>): void;
   recordOutputCompact(savedTokens?: number, metadata?: Record<string, unknown>): void;
+  recordObservationMask(savedTokens?: number, metadata?: Record<string, unknown>): void;
+  recordOutputDistill(savedTokens?: number, metadata?: Record<string, unknown>): void;
+  recordCacheAlignment(metadata?: Record<string, unknown>): void;
   setLastPruneEvent(evt: unknown): void;
   reset(): void;
   getStats(): TelemetryStats;
   getHistory(limit?: number): TelemetryEntry[];
-  toJSON(): TelemetryStats & { history: TelemetryEntry[] };
+  toJSON(): Record<string, unknown>;
   fromJSON(json: unknown): TokenslashTelemetryInstance;
 }
 

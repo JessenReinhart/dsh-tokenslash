@@ -192,6 +192,20 @@ Live telemetry sample:
   "estimatedCostSavedUsd": "0.54",
   "toolsPrunedCount": 26,
   "promptsPrunedCount": 26,
+  "observationMaskCount": 4,
+  "outputDistillCount": 12,
+  "cacheAlignmentEvents": 34,
+  "avgTokensSavedPerTurn": 9487,
+  "topPrunedTools": { "web_search": 14, "office": 12, "skill": 9 },
+  "byModule": {
+    "toolPrune": { "events": 26, "tokens": 118000 },
+    "promptPrune": { "events": 26, "tokens": 74000 },
+    "outputCompact": { "events": 5, "tokens": 18563 },
+    "observationMask": { "events": 4, "tokens": 2800 },
+    "outputDistill": { "events": 12, "tokens": 1400 },
+    "subagentDecouple": { "events": 7, "tokens": 32906 },
+    "cacheAlignment": { "events": 34, "tokens": 0 }
+  },
   "lastPruneEvent": {
     "toolsCount": 38,
     "sectionsCount": 8,
@@ -200,6 +214,7 @@ Live telemetry sample:
   }
 }
 ```
+The `/stats` endpoint returns a `byModule` breakdown (events + tokens saved per feature), `topPrunedTools` (most-pruned tools), `avgTokensSavedPerTurn`, and per-feature counters so you can see exactly which optimization is saving the most.
 
 ---
 
@@ -209,7 +224,7 @@ Live telemetry sample:
 npm test
 ```
 
-All 224 unit tests run via `node --test` without external dependencies or live network access.
+All 233 unit tests run via `node --test` without external dependencies or live network access.
 
 ## License
 
