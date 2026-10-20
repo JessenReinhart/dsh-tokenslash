@@ -123,3 +123,61 @@ describe("tokenslash_peek feature", () => {
     assert.equal(plugin.unlockRegistry.has("agent-42"), false, "registry deleted for agent on new turn");
   });
 });
+
+test("tokenslash_peek inspect returns presentation: native when modeFor is absent", async () => {
+  const registeredTools = new Map();
+  const mockCtx = {
+    tools: {
+      register: (toolDef) => { registeredTools.set(toolDef.name, toolDef); },
+      get: (name) => {
+        if (name === "grep") return { name: "grep", description: "Search text", parameters: { pattern: { type: "string" } } };
+        return null;
+      },
+    },
+    settings: { installSection: () => {} },
+    on: () => () => {},
+    inject: () => {},
+  };
+  apply(mockCtx, { enabled: true });
+  const peekTool = registeredTools.get("tokenslash_peek");
+  assert.ok(peekTool, "tokenslash_peek must be registered");
+  const res = await peekTool.execute(
+    { action: "inspect", tools: ["grep"] },
+    { agent: { id: "agent-99" } }
+  );
+  assert.equal(res.presentation, "native");
+  assert.equal(res.tools.grep.description, "Search text");
+  assert.deepEqual(res.tools.grep.parameters, { pattern: { type: "string" } });
+});
+
+test("tokenslash_peek inspect returns presentation: ptc and uses concise schema", async () => {
+  const registeredTools = new Map();
+  const mockCtx = {
+    tools: {
+      register: (toolDef) => { registeredTools.set(toolDef.name, toolDef); },
+      get: (name) => {
+        if (name === "read") return {
+          name: "read",
+          description: "Read file",
+          parameters: { file_path: { type: "string" } },
+          output: "def read(file_path: str) -> str",
+        };
+        return null;
+      },
+      modeFor: () => "ptc",
+    },
+    settings: { installSection: () => {} },
+    on: () => () => {},
+    inject: () => {},
+  };
+  apply(mockCtx, { enabled: true });
+  const peekTool = registeredTools.get("tokenslash_peek");
+  assert.ok(peekTool, "tokenslash_peek must be registered");
+  const res = await peekTool.execute(
+    { action: "inspect", tools: ["read"] },
+    { agent: { id: "agent-ptc" } }
+  );
+  assert.equal(res.presentation, "ptc");
+  assert.equal(res.tools.read.parameters, "def read(file_path: str) -> str");
+  assert.equal(res.tools.read.description, "Read file");
+});

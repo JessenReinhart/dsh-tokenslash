@@ -22,8 +22,10 @@ Over a 10-turn coding session, you burn **180,000+ tokens** just telling the LLM
 - 🧠 **Context-Aware Continuity:** "continue", "resume", or follow-up prompts automatically inherit your active tool set.
 - ⚡ **Sub-Second Triage:** Jev triage takes ~500ms over local proxy, with built-in fail-open safety (if triage fails, nothing is dropped).
 - 💰 **Subagent Model Tiering:** Automatically routes lightweight subagent tasks to cheaper models (`gemini-2.5-flash`, `deepseek-chat`).
-- 🦴 **`tokenslash_index`:** Tree-sitter-style file skeleton tool (imports, classes, functions, line ranges `[start-end]`) — 70–90% smaller than full `read`, call it first and read only what you need (inspired by [Maki](https://maki.sh/docs/token-economy/)).
-- 📦 **`tokenslash_batch`:** Run up to 15 independent tool calls in a single turn, collapsing multi-round-trip exploration into one context send.
+- 🦴 **`tokenslash_index`:** Structural skeleton tool (imports, classes, functions, line ranges `[start-end]`) across JS/TS, Python, Rust, Go, Java, HTML, Markdown, Lua, YAML, and TOML. Supports symbol filtering via `filter: "auth*"` or `/regex/` — 70–90% smaller than full `read`.
+- 📦 **`tokenslash_batch`:** Run up to 15 tool calls in a single turn. Supports concurrent `parallel` (default) or ordered `series` mode for dependent operations.
+- 👁️ **PTC Mode Aware `tokenslash_peek`:** Detects DSH Programmatic Tool Calling (`ptc`) mode and returns concise signatures instead of verbose JSON schemas.
+- 📊 **Native TokenMeter Integration:** Attaches to native DSH 0.2.x `ctx.tokenMeter` for BPE-precise token savings telemetry.
 - ✂️ **Tighter Output Compaction:** Default tool-output compaction limit lowered from 10,000 → 4,000 chars (configurable via `outputCompactLimit`).
 
 ---
@@ -204,7 +206,7 @@ Live telemetry sample:
 npm test
 ```
 
-All 181 unit tests run via `node --test` without external dependencies or live network access.
+All 195 unit tests run via `node --test` without external dependencies or live network access.
 
 ## License
 

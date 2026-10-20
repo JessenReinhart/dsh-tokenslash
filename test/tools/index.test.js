@@ -353,6 +353,112 @@ describe("tokenslash_index", () => {
     assert.match(res.skeletonText, /sub\//);
   });
 
+  test("indexes YAML file with sections, keys, lists, and anchors", async () => {
+    const file = await writeTempFile(
+      "config.yaml",
+      [
+        "version: 1",
+        "server:",
+        "  host: localhost",
+        "  port: 8080",
+        "  features:",
+        "    - auth",
+        "    - cache",
+        "defaults: &defaults",
+        "  timeout: 30",
+        "ref: *defaults",
+        "database:",
+        "  url: postgres://db",
+        "  pool: 5",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file);
+    assert.equal(res.language, "yaml");
+    assert.ok(res.symbols.some((s) => s.kind === "section" && s.signature.includes("server:")), "server section");
+    assert.ok(res.symbols.some((s) => s.kind === "key" && s.signature.includes("host:")) || res.symbols.some((s) => s.kind === "section" && s.signature.includes("host:")), "host key");
+    assert.ok(res.symbols.some((s) => s.kind === "list" && s.signature.includes("- auth")), "auth list item");
+    assert.ok(res.symbols.some((s) => s.kind === "anchor" && s.signature.includes("&defaults")), "anchor definition");
+    assert.ok(res.symbols.some((s) => s.signature.includes("*defaults")), "anchor reference");
+  });
+
+  test("indexes TOML file with tables, array of tables, and keys", async () => {
+    const file = await writeTempFile(
+      "config.toml",
+      [
+        "title = \"My App\"",
+        "version = \"1.2.3\"",
+        "",
+        "[server]",
+        "host = \"localhost\"",
+        "port = 8080",
+        "",
+        "[[routes]]",
+        "path = \"/\"",
+        "handler = \"home\"",
+        "",
+        "[[routes]]",
+        "path = \"/api\"",
+        "handler = \"api\"",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file);
+    assert.equal(res.language, "toml");
+    assert.ok(res.symbols.some((s) => s.kind === "key" && s.signature.includes("title =")), "title key");
+    assert.ok(res.symbols.some((s) => s.kind === "table" && s.signature.includes("[server]")), "server table");
+    assert.ok(res.symbols.some((s) => s.kind === "key" && s.signature.includes("host =")), "host key");
+    assert.ok(res.symbols.some((s) => s.kind === "array_table" && s.signature.includes("[[routes]]")), "routes array table");
+  });
+
+  test("filters symbols by case-insensitive keyword", async () => {
+    const file = await writeTempFile(
+      "filter.ts",
+      [
+        "export function handleAuth() {}",
+        "function helper() {}",
+        "export const authToken = 'x';",
+        "class Service {}",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file, { filter: "auth" });
+    assert.equal(res.language, "typescript");
+    assert.ok(res.symbols.length > 0, "some symbols matched");
+    assert.ok(res.symbols.every((s) => s.signature.toLowerCase().includes("auth")), "all matches contain auth");
+    assert.match(res.skeletonText, /handleAuth|authToken/);
+  });
+
+  test("supports string filter positional argument", async () => {
+    const file = await writeTempFile(
+      "filter2.ts",
+      [
+        "export function handleAuth() {}",
+        "function helper() {}",
+        "export const authToken = 'x';",
+        "class Service {}",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file, "export");
+    assert.ok(res.symbols.length > 0, "some symbols matched");
+    assert.ok(res.symbols.every((s) => s.signature.includes("export")), "all matches contain export");
+  });
+
+  test("returns no-match message when filter matches nothing", async () => {
+    const file = await writeTempFile(
+      "nomatch.ts",
+      [
+        "export function handleAuth() {}",
+        "function helper() {}",
+      ].join("\n")
+    );
+
+    const res = await indexFile(file, { filter: "nonexistent_symbol_xyz" });
+    assert.equal(res.symbols.length, 0);
+    assert.match(res.skeletonText, /no structural symbols matched filter: "nonexistent_symbol_xyz"/);
+  });
+
   test("errors on missing file", async () => {
     await assert.rejects(() => indexFile(path.join(os.tmpdir(), "definitely-not-here-xyz.js")));
   });

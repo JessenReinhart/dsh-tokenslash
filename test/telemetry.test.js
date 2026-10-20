@@ -117,3 +117,38 @@ test("getStats reports mixed tokenizerMode when both modes recorded", () => {
   assert.equal(stats.bpeEventCount, 1);
   assert.equal(stats.fallbackEventCount, 1);
 });
+
+test("attachTokenMeter stores meter and exposes hasNativeTokenMeter", () => {
+  const t = new TokenslashTelemetry();
+  assert.equal(t.hasNativeTokenMeter, false);
+
+  t.attachTokenMeter(null);
+  assert.equal(t.hasNativeTokenMeter, false);
+
+  const meter = { measure: () => 10 };
+  t.attachTokenMeter(meter);
+  assert.equal(t.hasNativeTokenMeter, true);
+  assert.equal(t.tokenMeter, meter);
+});
+
+test("recordToolPrune estimates savedTokens via tokenMeter when undefined and text present", () => {
+  const t = new TokenslashTelemetry();
+  t.attachTokenMeter({ measure: (text) => (text ? text.split(/\s+/).length : 0) });
+  t.recordToolPrune(undefined, { text: "one two three four" });
+  assert.equal(t.totalTokensSaved, 4, "estimate 4 tokens from 4 words");
+  assert.equal(t.toolsPrunedCount, 1);
+});
+
+test("recordOutputCompact keeps provided number when savedTokens is defined", () => {
+  const t = new TokenslashTelemetry();
+  t.attachTokenMeter({ measure: () => 999 });
+  t.recordOutputCompact(123, { text: "ignored because savedTokens provided" });
+  assert.equal(t.totalTokensSaved, 123);
+});
+
+test("recordPromptPrune falls back to 0 when meter missing and savedTokens undefined", () => {
+  const t = new TokenslashTelemetry();
+  t.recordPromptPrune(undefined, { text: "no meter attached" });
+  assert.equal(t.totalTokensSaved, 0);
+  assert.equal(t.promptsPrunedCount, 1);
+});

@@ -144,4 +144,76 @@ describe("tokenslash_batch", () => {
     assert.equal(res.results[0].tool, "skill");
     assert.equal(res.results[0].result, "skill:tokenslash-workflow");
   });
+
+  test("mode: series executes calls sequentially in order", async () => {
+    const order = [];
+    const ctx = makeCtx({
+      first: { execute: async () => { await new Promise((r) => setTimeout(r, 20)); order.push("first"); return "first"; } },
+      second: { execute: async () => { order.push("second"); return "second"; } },
+      third: { execute: async () => { order.push("third"); return "third"; } },
+    });
+
+    const res = await executeBatch(
+      [
+        { tool: "first", args: {} },
+        { tool: "second", args: {} },
+        { tool: "third", args: {} },
+      ],
+      ctx,
+      undefined,
+      { mode: "series" }
+    );
+
+    assert.deepEqual(order, ["first", "second", "third"]);
+    assert.equal(res.count, 3);
+    assert.equal(res.successful, 3);
+    assert.deepEqual(res.results.map((r) => r.result), ["first", "second", "third"]);
+  });
+
+  test("mode: series isolates failures and continues with remaining calls", async () => {
+    const order = [];
+    const ctx = makeCtx({
+      boom: { execute: async () => { order.push("boom"); throw new Error("boom failed"); } },
+      ok: { execute: async () => { order.push("ok"); return "ok"; } },
+      after: { execute: async () => { order.push("after"); return "after"; } },
+    });
+
+    const res = await executeBatch(
+      [
+        { tool: "boom", args: {} },
+        { tool: "ok", args: {} },
+        { tool: "after", args: {} },
+      ],
+      ctx,
+      undefined,
+      { mode: "series" }
+    );
+
+    assert.deepEqual(order, ["boom", "ok", "after"]);
+    assert.equal(res.successful, 2);
+    assert.equal(res.failed, 1);
+    assert.equal(res.results[0].success, false);
+    assert.match(res.results[0].error, /boom failed/);
+    assert.equal(res.results[2].result, "after");
+  });
+
+  test("omitted mode defaults to parallel", async () => {
+    const runs = [];
+    const ctx = makeCtx({
+      a: { execute: async () => { runs.push("a-start"); await new Promise((r) => setTimeout(r, 20)); runs.push("a-end"); return "a"; } },
+      b: { execute: async () => { runs.push("b-start"); await new Promise((r) => setTimeout(r, 5)); runs.push("b-end"); return "b"; } },
+    });
+
+    const res = await executeBatch(
+      [{ tool: "a", args: {} }, { tool: "b", args: {} }],
+      ctx
+    );
+
+    assert.equal(res.count, 2);
+    assert.equal(res.successful, 2);
+    // Both calls start before either finishes (parallel, default mode) —
+    // demonstrates the default is not sequential.
+    assert.equal(runs[0], "a-start");
+    assert.equal(runs[1], "b-start");
+  });
 });
