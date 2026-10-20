@@ -133,3 +133,23 @@ test("pruneHook survives Cordis proxy rejection of uninjected services", async (
   assert.equal(decision.content[0].text, "summary text");
   assert.equal(telemetry.outputsCompactedCount, 1);
 });
+
+test("pruneHook: yields when nativeServices.nativeToolResultPruner is true without modifying result", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const hook = createPruneHook({}, {}, () => enabledConfig, telemetry, { nativeToolResultPruner: true });
+  const largeOutput = "z".repeat(20000);
+  const res = await hook({ name: "read" }, largeOutput);
+  assert.equal(res, largeOutput);
+  assert.equal(telemetry.outputsCompactedCount, 0);
+
+  const waterfallRes = await hook({ name: "read" }, { value: largeOutput }, async () => ({ kind: "nextCalled" }));
+  assert.equal(waterfallRes.kind, "nextCalled");
+});
+
+test("pruneHook: passes result through unchanged when nativeToolResultPruner is true and next is undefined", async () => {
+  const hook = createPruneHook({}, null, () => ({}), null, { nativeToolResultPruner: true });
+  const largeResult = "x".repeat(30000);
+  const res = await hook({ name: "bash" }, largeResult, undefined);
+  assert.equal(res, largeResult);
+});
+

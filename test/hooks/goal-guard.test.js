@@ -28,3 +28,20 @@ test("goalGuardHook handles missing fields", async () => {
   const res = await guard(null);
   assert.equal(res, null);
 });
+
+test("goalGuardHook: yields when nativeServices.goalRoundDriver is true", async () => {
+  let noticeCalled = false;
+  const ctx = {
+    notice: () => { noticeCalled = true; },
+  };
+  const guard = createGoalGuardHook(ctx, () => ({}), { goalRoundDriver: true });
+  const res = await guard({ name: "deep-search", maxRounds: 10, rounds: 9 });
+  assert.equal(res, null);
+  assert.equal(noticeCalled, false);
+});
+
+test("goalGuardHook: yields for high-budget payload when nativeServices.goalRoundDriver is true", () => {
+  const guard = createGoalGuardHook({}, () => ({}), { goalRoundDriver: true });
+  const res = guard({ maxRounds: 10, roundsStarted: 9 });
+  assert.equal(res, null, "native passthrough must return null even at 90% budget");
+});

@@ -124,6 +124,18 @@ Routes subagent delegations based on task complexity. Sends simple file lookups 
 ### 5. Tool Output Pruning & Compaction
 When tools return massive payloads (>10KB JSON or huge diffs), TokenSlash condenses the result to essentials so history doesn't bloat your context window.
 
+### 6. Version-Aware DSH 0.2.x Compatibility
+TokenSlash detects native DSH services at plugin initialization and gracefully yields redundant hooks on modern hosts while keeping full fallback coverage on older DSH builds:
+
+| Hook | Native DSH 0.2.x Service | Behavior on 0.2.x | Behavior on 0.1.5 |
+|---|---|---|---|
+| Context Compaction | `dsh-compaction-basic` | **Yields** (avoids tool-call pairing violations) | Active |
+| Tool Result Pruner | `dsh-compaction-tool-result-pruner` | **Yields** (no double-truncation) | Active |
+| Goal Guard | `dsh-tool-goal` / `dsh-goal-round-driver` | **Yields** (host enforces round caps) | Active |
+| Subagent Routing | `dsh-tool-subagent` model selection | **Yields** (host handles provider/model) | Active |
+
+Detection is purely capability-based (`detectNativeServices(ctx)`). No version string parsing.
+
 ---
 
 ## LocalJev Provider Setup
@@ -192,7 +204,7 @@ Live telemetry sample:
 npm test
 ```
 
-All 71 test suites run without external dependencies or live network access.
+All 181 unit tests run via `node --test` without external dependencies or live network access.
 
 ## License
 

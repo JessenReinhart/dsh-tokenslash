@@ -241,3 +241,62 @@ test("attachSubagentRouting monkey-patches startContinuable and start", async ()
   assert.equal(typeof registeredDisposer, "function");
   registeredDisposer();
 });
+
+test("attachSubagentRouting: yields without injecting subagents when nativeServices.subagentModelSelection is true", () => {
+  let injectCalled = false;
+  const ctx = {
+    inject: () => {
+      injectCalled = true;
+    },
+    logger: {
+      debug: () => {},
+    },
+  };
+  const disposer = attachSubagentRouting(ctx, { enabled: true }, null, null, { subagentModelSelection: true });
+  assert.equal(injectCalled, false, "ctx.inject must not be called when native subagent routing is available");
+  assert.equal(typeof disposer, "function");
+});
+
+test("attachSubagentRouting: injects subagents when nativeServices is false/omitted", () => {
+  let injectCalled = false;
+  const ctx = {
+    inject: (deps, cb) => {
+      injectCalled = true;
+      assert.deepEqual(deps, ["subagents"]);
+      return () => {};
+    },
+  };
+  attachSubagentRouting(ctx, { enabled: true }, null, null, { subagentModelSelection: false });
+  assert.equal(injectCalled, true, "ctx.inject must be called when native subagent routing is absent");
+});
+
+test("attachSubagentRouting with nativeServices.subagentModelSelection: true does not call ctx.inject and returns function", () => {
+  const mockCtx = {
+    inject: () => {
+      throw new Error("should not inject");
+    },
+    logger: null,
+  };
+  const disposer = attachSubagentRouting(mockCtx, {}, null, null, { subagentModelSelection: true });
+  assert.equal(typeof disposer, "function");
+});
+
+test("attachSubagentRouting calls ctx.inject when nativeServices is absent or false", () => {
+  let injected = false;
+  const mockCtx = {
+    inject: (deps, cb) => {
+      injected = true;
+      return () => {};
+    },
+  };
+
+  // Test absent nativeServices
+  attachSubagentRouting(mockCtx, {}, null, null);
+  assert.equal(injected, true);
+
+  // Test nativeServices={ subagentModelSelection: false }
+  injected = false;
+  attachSubagentRouting(mockCtx, {}, null, null, { subagentModelSelection: false });
+  assert.equal(injected, true);
+});
+

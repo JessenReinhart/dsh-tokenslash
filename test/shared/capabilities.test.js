@@ -24,6 +24,7 @@ import {
   canPersist,
   persistSettings,
   capabilitySnapshot,
+  detectNativeServices,
 } from "../../lib/shared/capabilities.js";
 import { registerBridgeRoutes } from "../../lib/routes/bridge.js";
 import { BRIDGE_PREFIX } from "../../lib/shared/constants.js";
@@ -811,3 +812,107 @@ test("bridge save rejects non-POST with 405", async () => {
   await bridge.save.handler({ method: "GET", url: `${BRIDGE_PREFIX}/save` }, res);
   assert.equal(res.statusCode, 405);
 });
+
+// ---------------------------------------------------------------------------
+// detectNativeServices & capabilitySnapshot
+// ---------------------------------------------------------------------------
+
+test("detectNativeServices: returns all false on empty context", () => {
+  const ctx = makeCtx();
+  const flags = detectNativeServices(ctx);
+  assert.equal(flags.compaction, false);
+  assert.equal(flags.tokenMeter, false);
+  assert.equal(flags.goalRoundDriver, false);
+  assert.equal(flags.nativeToolResultPruner, false);
+  assert.equal(flags.subagentModelSelection, false);
+});
+
+test("detectNativeServices: detects native compaction and tokenMeter", () => {
+  const ctx = makeCtx({
+    services: {
+      compaction: { compact: () => {} },
+      tokenMeter: { measure: () => {} },
+    },
+  });
+  const flags = detectNativeServices(ctx);
+  assert.equal(flags.compaction, true);
+  assert.equal(flags.tokenMeter, true);
+  assert.equal(flags.goalRoundDriver, false);
+  assert.equal(flags.nativeToolResultPruner, false);
+});
+
+test("detectNativeServices: detects goalRoundDriver or goal service", () => {
+  const ctx1 = makeCtx({ services: { goalRoundDriver: {} } });
+  assert.equal(detectNativeServices(ctx1).goalRoundDriver, true);
+
+  const ctx2 = makeCtx({ services: { goal: {} } });
+  assert.equal(detectNativeServices(ctx2).goalRoundDriver, true);
+});
+
+test("detectNativeServices: detects subagentModelSelection when subagents has rich methods", () => {
+  const ctxOld = makeCtx({
+    services: {
+      subagents: { start: () => {} },
+    },
+  });
+  assert.equal(detectNativeServices(ctxOld).subagentModelSelection, false);
+
+  const ctxNew = makeCtx({
+    services: {
+      subagents: {
+        start: () => {},
+        startContinuable: () => {},
+        fork: () => {},
+        resolveChildAgentOptions: () => {},
+      },
+    },
+  });
+  assert.equal(detectNativeServices(ctxNew).subagentModelSelection, true);
+});
+
+test("capabilitySnapshot includes nativeServices snapshot", () => {
+  const ctx = makeCtx({ services: { compaction: {} } });
+  const snap = capabilitySnapshot(ctx);
+  assert.ok(snap.nativeServices);
+  assert.equal(snap.nativeServices.compaction, true);
+  assert.equal(snap.nativeServices.tokenMeter, false);
+});
+
+test("detectNativeServices: verifies flags via custom ctx.get lookup", () => {
+  // Empty ctx: all flags false
+  const emptyCtx = { get: () => undefined };
+  const emptyFlags = detectNativeServices(emptyCtx);
+  assert.deepEqual(emptyFlags, {
+    compaction: false,
+    tokenMeter: false,
+    goalRoundDriver: false,
+    nativeToolResultPruner: false,
+    subagentModelSelection: false,
+  });
+
+  // Ctx exposing compaction service: compaction is true and others false
+  const compactionCtx = { get: (name) => (name === "compaction" ? { compact() {} } : undefined) };
+  const compactionFlags = detectNativeServices(compactionCtx);
+  assert.deepEqual(compactionFlags, {
+    compaction: true,
+    tokenMeter: false,
+    goalRoundDriver: false,
+    nativeToolResultPruner: false,
+    subagentModelSelection: false,
+  });
+
+  // Ctx exposing subagents with startContinuable, start, fork: subagentModelSelection is true
+  const subagentsService = {
+    startContinuable() {},
+    start() {},
+    fork() {},
+  };
+  const subagentsCtx = { get: (name) => (name === "subagents" ? subagentsService : undefined) };
+  const subagentsFlags = detectNativeServices(subagentsCtx);
+  assert.equal(subagentsFlags.subagentModelSelection, true);
+  assert.equal(subagentsFlags.compaction, false);
+  assert.equal(subagentsFlags.tokenMeter, false);
+  assert.equal(subagentsFlags.goalRoundDriver, false);
+  assert.equal(subagentsFlags.nativeToolResultPruner, false);
+});
+
