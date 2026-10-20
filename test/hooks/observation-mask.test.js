@@ -244,6 +244,22 @@ describe("observation-mask hook", () => {
     }
   });
 
+  test("telemetry.record receives observation-mask savings (regression: recordSaved bug)", async () => {
+    const telemetry = { totalTokensSaved: 0, calls: [] };
+    telemetry.record = (action, tokens, meta) => {
+      telemetry.totalTokensSaved += tokens;
+      telemetry.calls.push({ action, tokens, meta });
+    };
+    const hook = createObservationMaskHook({}, defaultConfig, telemetry);
+    const msgs = buildConvo({ turnCount: 4, toolOutputSize: 2000 });
+    await hook(msgs);
+    assert.ok(telemetry.totalTokensSaved > 0, "telemetry must record saved tokens");
+    assert.ok(telemetry.calls.length > 0, "telemetry.record must be called");
+    assert.equal(telemetry.calls[0].action, "observation-mask");
+    assert.ok(typeof telemetry.calls[0].meta?.maskedCount === "number");
+    assert.ok(telemetry.calls[0].meta.maskedCount >= 1);
+  });
+
   test("masked stub contains lines and token estimates", async () => {
     const hook = createObservationMaskHook({}, defaultConfig, null);
     const multilineContent = "line1\nline2\nline3\n" + bigString(2000);

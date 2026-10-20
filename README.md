@@ -209,7 +209,7 @@ Live telemetry sample:
 npm test
 ```
 
-All 223 unit tests run via `node --test` without external dependencies or live network access.
+All 224 unit tests run via `node --test` without external dependencies or live network access.
 
 ## License
 
