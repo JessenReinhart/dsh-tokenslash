@@ -8,6 +8,8 @@ import {
   classifyTaskTier,
   pickTierModel,
   extractTaskText,
+  triageTaskTier,
+  triageSubagentFanout,
 } from "../../lib/hooks/routing.js";
 
 test("routingHook continues when modules disabled", async () => {
@@ -298,5 +300,133 @@ test("attachSubagentRouting calls ctx.inject when nativeServices is absent or fa
   injected = false;
   attachSubagentRouting(mockCtx, {}, null, null, { subagentModelSelection: false });
   assert.equal(injected, true);
+});
+
+// === Structured Jev triage tests ===
+
+test("routingHook vetoes when noul score < 0.5", async () => {
+  const mockJev = {
+    triage: async () => ({
+      answers: { route: { noul: 0.2 } },
+    }),
+  };
+  const hook = createRoutingHook({}, { modules: { subagentRouting: true } }, mockJev);
+  const res = await hook({ name: "pwsh" }, { command: "echo hi" });
+  assert.equal(res.continue, false);
+  assert.equal(res.reason, "routing veto");
+});
+
+test("routingHook continues when noul score >= 0.5", async () => {
+  const mockJev = {
+    triage: async () => ({
+      answers: { route: { noul: 0.8 } },
+    }),
+  };
+  const hook = createRoutingHook({}, { modules: { subagentRouting: true } }, mockJev);
+  const res = await hook({ name: "pwsh" }, { command: "echo hi" });
+  assert.equal(res.continue, true);
+});
+
+test("routingHook sends structured noul/choice questions", async () => {
+  let capturedQuestions;
+  const mockJev = {
+    triage: async (questions) => {
+      capturedQuestions = questions;
+      return { answers: { route: { noul: 0.9 }, prune: { choice: "pass" } } };
+    },
+  };
+  const hook = createRoutingHook({}, { modules: { subagentRouting: true, toolPruning: true } }, mockJev);
+  await hook({ name: "read" }, { file_path: "test.js" });
+
+  assert.equal(capturedQuestions.route.type, "noul");
+  assert.ok(capturedQuestions.route.instructions.includes("read"));
+  assert.equal(capturedQuestions.prune.type, "choice");
+  assert.ok(capturedQuestions.prune.criteria.pass);
+  assert.ok(capturedQuestions.prune.criteria.prune);
+});
+
+test("triageTaskTier uses triageBatch and returns valid tier", async () => {
+  const mockJev = {
+    triage: async () => ({
+      answers: { tier: { choice: "smart" } },
+    }),
+  };
+  const result = await triageTaskTier("complex architecture refactoring task", mockJev, { model: "test-model" });
+  assert.equal(result, "smart");
+});
+
+test("triageTaskTier falls back to classifyTaskTier on no client", async () => {
+  const result = await triageTaskTier("simple echo", null, {});
+  assert.equal(result, "cheap");
+});
+
+test("triageTaskTier falls back to classifyTaskTier on triage error", async () => {
+  const mockJev = {
+    triage: async () => { throw new Error("timeout"); },
+  };
+  // "architecture review" is < 150 chars with no "reason/analyze/complex" keyword → classifyTaskTier returns "cheap"
+  const result = await triageTaskTier("architecture review", mockJev, {});
+  assert.equal(result, "cheap");
+});
+
+test("triageSubagentFanout batches multiple tasks into one call", async () => {
+  let callCount = 0;
+  let capturedQuestions;
+  const mockJev = {
+    triage: async (questions) => {
+      callCount++;
+      capturedQuestions = questions;
+      return {
+        answers: {
+          "task1__tier": { choice: "cheap" },
+          "task1__can_decouple": { noul: 0.95 },
+          "task2__tier": { choice: "smart" },
+          "task2__can_decouple": { noul: 0.3 },
+        },
+      };
+    },
+  };
+
+  const tasks = [
+    { id: "task1", text: "simple lookup" },
+    { id: "task2", text: "complex deep reasoning problem" },
+  ];
+
+  const result = await triageSubagentFanout(tasks, mockJev, { model: "test", decoupleThreshold: 0.85 });
+
+  assert.equal(callCount, 1, "triageBatch should fire ONE request");
+  assert.equal(result.task1.tier, "cheap");
+  assert.equal(result.task1.canDecouple, true);
+  assert.equal(result.task2.tier, "smart");
+  assert.equal(result.task2.canDecouple, false);
+});
+
+test("triageSubagentFanout fail-open when no client", async () => {
+  const tasks = [
+    { id: "t1", text: "quick search" },
+    { id: "t2", text: "a".repeat(200) + " deep architecture audit" },
+  ];
+
+  const result = await triageSubagentFanout(tasks, null, {});
+  assert.equal(result.t1.tier, "cheap");
+  assert.equal(result.t1.canDecouple, true);
+  assert.equal(result.t2.tier, "extreme");
+  assert.equal(result.t2.canDecouple, true);
+});
+
+test("triageSubagentFanout fail-open on triage error", async () => {
+  const mockJev = {
+    triage: async () => { throw new Error("network error"); },
+  };
+
+  const tasks = [{ id: "t1", text: "simple task" }];
+  const result = await triageSubagentFanout(tasks, mockJev, {});
+  assert.equal(result.t1.tier, "cheap");
+  assert.equal(result.t1.canDecouple, true);
+});
+
+test("triageSubagentFanout returns empty object for empty tasks", async () => {
+  const result = await triageSubagentFanout([], null, {});
+  assert.deepEqual(result, {});
 });
 

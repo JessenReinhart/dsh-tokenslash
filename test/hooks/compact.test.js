@@ -1,7 +1,9 @@
 // test/hooks/compact.test.js
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createCompactHook } from "../../lib/hooks/compact.js";
+import { createCompactHook, classifyObservation } from "../../lib/hooks/compact.js";
+import { goalDriftCheck } from "../../lib/hooks/goal-guard.js";
+import { clearTriageCache } from "../../lib/triage.js";
 
 const mockLLMCtx = {
   llm: {
@@ -75,4 +77,92 @@ test("compactHook: native passthrough returns 30k-char messages unchanged withou
   const res = await hook(msgs);
   assert.equal(res, msgs, "must return the exact same array reference");
   assert.equal(res[0].content.length, 30000, "content must not be truncated");
+});
+
+test("classifyObservation: returns pass when output under threshold", async () => {
+  const res = await classifyObservation(null, { toolName: "read", output: "hello world", thresholdTokens: 100 });
+  assert.deepEqual(res, { action: "pass" });
+});
+
+test("classifyObservation: invokes triageBatch and returns choice when over threshold", async () => {
+  clearTriageCache();
+  let triageCalled = false;
+  let receivedState = "";
+  const mockJev = {
+    triage: async (questions, opts) => {
+      triageCalled = true;
+      receivedState = opts?.state || "";
+      return {
+        answers: {
+          action: {
+            choice: "mask",
+            score: 0.95,
+          },
+        },
+      };
+    },
+  };
+
+  const largeOutput = "log line: process running...\n".repeat(200);
+  const res = await classifyObservation(mockJev, { toolName: "run_build", output: largeOutput, thresholdTokens: 50 });
+
+  assert.equal(triageCalled, true);
+  assert.ok(receivedState.startsWith("run_build\n"));
+  assert.deepEqual(res, { action: "mask" });
+});
+
+test("classifyObservation: fails open to pass on error", async () => {
+  clearTriageCache();
+  const failingJev = {
+    triage: async () => {
+      throw new Error("System One unavailable");
+    },
+  };
+  const largeOutput = "large text ".repeat(100);
+  const res = await classifyObservation(failingJev, { toolName: "bash", output: largeOutput, thresholdTokens: 10 });
+  assert.deepEqual(res, { action: "pass" });
+});
+
+test("goalDriftCheck: returns onTrack and confidence from noul score", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => ({
+      answers: {
+        on_track: {
+          noul: 0.88,
+        },
+      },
+    }),
+  };
+
+  const res = await goalDriftCheck(mockJev, "Fix authentication bug", "Refactoring auth middleware token check");
+  assert.deepEqual(res, { onTrack: true, confidence: 0.88 });
+});
+
+test("goalDriftCheck: flags drift when noul score is below threshold", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => ({
+      answers: {
+        on_track: {
+          noul: 0.25,
+        },
+      },
+    }),
+  };
+
+  const res = await goalDriftCheck(mockJev, "Fix authentication bug", "Playing chess game in terminal");
+  assert.deepEqual(res, { onTrack: false, confidence: 0.25 });
+});
+
+test("goalDriftCheck: fails open to onTrack: true on error", async () => {
+  clearTriageCache();
+  const failingJev = {
+    triage: async () => {
+      throw new Error("Network timeout");
+    },
+  };
+
+  const res = await goalDriftCheck(failingJev, "Fix bug", "Some output");
+  assert.equal(res.onTrack, true);
 });

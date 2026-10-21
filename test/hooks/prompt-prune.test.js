@@ -16,6 +16,7 @@ import {
   CORE_TOOLS,
 } from "../../lib/hooks/prompt-prune.js";
 import { TokenslashTelemetry } from "../../lib/telemetry.js";
+import { clearTriageCache } from "../../lib/triage.js";
 
 test("detectRequiredGroups detects intents correctly", () => {
   // Simple prompt with no special intent
@@ -408,6 +409,7 @@ test("F2: pinnedTools survive pruning in extreme mode and preserve section docs"
 });
 
 test("F3: detectRequiredGroupsViaJev failOpen returns all groups on error or malformed response", async () => {
+  clearTriageCache();
   const badClient = { triage: async () => { throw new Error("timeout"); } };
   const groupsError = await detectRequiredGroupsViaJev("do work", badClient, { failOpen: true });
   assert.equal(groupsError.size, Object.keys(TOOL_GROUPS).length);
@@ -555,6 +557,7 @@ test("CORE_TOOLS includes essential control tools", () => {
 });
 
 test("TTFT: detectRequiredGroupsViaJev caches triage results and avoids repeated network calls", async () => {
+  clearTriageCache();
   let callCount = 0;
   const mockClient = {
     triage: async () => {
