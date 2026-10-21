@@ -356,3 +356,18 @@ test("toJSON and fromJSON roundtrip preserves all new metrics and counters", () 
   const restoredStats = restored.getStats();
   assert.equal(restoredStats.avgTokensSavedPerTurn, t.getStats().avgTokensSavedPerTurn);
 });
+
+test("smoke test: multi-session savings and getStats tracking", () => {
+  const t = new TokenslashTelemetry();
+
+  t.setActiveSession("session-1");
+  t.recordPromptPrune(500);
+
+  t.setActiveSession("session-2");
+  t.recordPromptPrune(300);
+
+  assert.equal(t.getStats("session-1").sessionTokensSaved, 500);
+  assert.equal(t.getStats("session-2").sessionTokensSaved, 300);
+  assert.equal(t.getStats().totalTokensSaved, 800);
+  assert.equal(t.getStats().sessionTokensSaved, 300);
+});
