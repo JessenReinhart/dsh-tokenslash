@@ -11,6 +11,7 @@ import {
   injectToolGuidance,
   stableSortTools,
   stableSortSections,
+  injectPrunedToolsNotice,
   TOOL_GROUPS,
   CORE_TOOLS,
 } from "../../lib/hooks/prompt-prune.js";
@@ -506,9 +507,9 @@ test("promptPruneHook sorts surviving tools and sections canonically with prefix
   assert.deepEqual(toolNames, ["read", "write"]);
 
   const sectionNames = res.sections.map((s) => s.name);
-  // Pruned: free-search. Injected: tokenslash-pruned-tools (order 0).
-  // Retained sorted: system (-10), tokenslash-pruned-tools (0), alpha (5), zeta (10).
-  assert.deepEqual(sectionNames, ["system", "tokenslash-pruned-tools", "alpha", "zeta"]);
+  // Pruned: free-search. Injected: tokenslash-pruned-tools (order 20000, sunk to the end to protect prefix cache).
+  // Retained sorted: system (-10), alpha (5), zeta (10), tokenslash-pruned-tools (20000).
+  assert.deepEqual(sectionNames, ["system", "alpha", "zeta", "tokenslash-pruned-tools"]);
 });
 
 test("teams and schedule tool groups are defined with modern DSH tools", () => {
@@ -552,3 +553,30 @@ test("CORE_TOOLS includes essential control tools", () => {
     assert.ok(CORE_TOOLS.has(name), `expected ${name} in CORE_TOOLS`);
   }
 });
+
+test("TTFT: detectRequiredGroupsViaJev caches triage results and avoids repeated network calls", async () => {
+  let callCount = 0;
+  const mockClient = {
+    triage: async () => {
+      callCount++;
+      return { answers: { search: 0.9, file_ops: 0.1 } };
+    },
+  };
+  const prompt = "Please check the latest weather in Jakarta online today";
+  const first = await detectRequiredGroupsViaJev(prompt, mockClient, {});
+  assert.equal(callCount, 1, "First invocation calls triage endpoint");
+  assert.ok(first.has("search"));
+
+  const second = await detectRequiredGroupsViaJev(prompt, mockClient, {});
+  assert.equal(callCount, 1, "Second invocation with identical prompt hits cache without calling triage");
+  assert.ok(second.has("search"));
+});
+
+test("TTFT: injectPrunedToolsNotice assigns order 20000 to sink volatile notice to prompt end", () => {
+  const sections = [{ name: "persona", text: "You are agent.", order: 0 }];
+  const out = injectPrunedToolsNotice(sections, ["web_search"]);
+  const notice = out.find((s) => s.name === "tokenslash-pruned-tools");
+  assert.ok(notice, "Notice section exists");
+  assert.equal(notice.order, 20000, "Notice must have order 20000 to protect static prefix cache");
+});
+
