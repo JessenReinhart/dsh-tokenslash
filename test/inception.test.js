@@ -1,115 +1,147 @@
-import test from "node:test";
+// test/inception.test.js — Inception Labs Mercury Decide provider integration tests
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { JevClient } from "../lib/jev-client.js";
+import { getProviderConfig, listProviders } from "../lib/providers.js";
 import { JEV_PROVIDERS, TOKEN_COST_PER_1K } from "../lib/shared/constants.js";
-import { listProviders, getProviderConfig } from "../lib/providers.js";
 
-test("Inception provider: registration in JEV_PROVIDERS", () => {
-  const inc = JEV_PROVIDERS.inception;
-  assert.ok(inc, "inception provider must exist in JEV_PROVIDERS");
-  assert.equal(inc.baseUrl, "https://api.inceptionlabs.ai/v1/decisions");
-  assert.equal(inc.endpoint, "/v1/decisions");
-  assert.equal(inc.defaultModel, "mercury-decide");
-  assert.equal(inc.needsAuth, true);
+const ORIGINAL_FETCH = globalThis.fetch;
+
+function restoreFetch() {
+  globalThis.fetch = ORIGINAL_FETCH;
+}
+
+// 1. Provider registration
+test("1. Provider registration: JEV_PROVIDERS.inception exists with correct fields", () => {
+  const inception = JEV_PROVIDERS.inception;
+  assert.ok(inception, "inception provider must exist in JEV_PROVIDERS");
+  assert.equal(inception.baseUrl, "https://api.inceptionlabs.ai/v1/decisions");
+  assert.equal(inception.endpoint, "/v1/decisions");
+  assert.equal(inception.defaultModel, "mercury-decide");
+  assert.equal(inception.needsAuth, true);
 });
 
-test("Inception provider: listProviders includes inception", () => {
+// 2. listProviders includes inception
+test("2. listProviders includes inception: verify entry with id 'inception'", () => {
   const providers = listProviders();
-  const inc = providers.find((p) => p.id === "inception");
-  assert.ok(inc, "listProviders must include inception");
-  assert.equal(inc.defaultModel, "mercury-decide");
+  const inception = providers.find((p) => p.id === "inception");
+  assert.ok(inception, "listProviders() must return an entry with id: 'inception'");
+  assert.equal(inception.id, "inception");
+  assert.equal(inception.name, "Inception Labs (Mercury Decide)");
+  assert.equal(inception.defaultModel, "mercury-decide");
 });
 
-test("Inception provider: TOKEN_COST_PER_1K includes mercury-decide", () => {
-  assert.equal(TOKEN_COST_PER_1K["mercury-decide"], 0.00002);
-});
-
-test("Inception provider: getProviderConfig returns correct config", () => {
-  const cfg = getProviderConfig("inception", { apiKey: "test-sk-123" });
-  assert.equal(cfg.id, "inception");
-  assert.equal(cfg.baseUrl, "https://api.inceptionlabs.ai/v1/decisions");
-  assert.equal(cfg.apiKey, "test-sk-123");
-  assert.equal(cfg.model, "mercury-decide");
-});
-
-test("Inception provider: JevClient buildUrl targets /v1/decisions", () => {
-  const client = new JevClient({ provider: "inception", apiKey: "test-sk" });
+// 3. JevClient buildUrl for inception
+test("3. JevClient buildUrl for inception: returns decisions endpoint instead of /v1/systemone", () => {
+  const client = new JevClient({ provider: "inception", apiKey: "test-key" });
   assert.equal(client.buildUrl(), "https://api.inceptionlabs.ai/v1/decisions");
   assert.equal(client.buildUrl("/v1/systemone"), "https://api.inceptionlabs.ai/v1/decisions");
   assert.equal(client.buildUrl(""), "https://api.inceptionlabs.ai/v1/decisions");
 });
 
-test("Inception provider: JevClient buildUrl with custom base URL", () => {
+// 4. JevClient buildUrl for inception with custom baseUrl
+test("4. JevClient buildUrl for inception with custom baseUrl: returns custom URL", () => {
   const client = new JevClient({
     provider: "inception",
-    customBaseUrl: "https://proxy.inceptionlabs.ai/v1/decisions",
-    apiKey: "test-sk",
+    customBaseUrl: "https://custom.inceptionlabs.ai/v1/decisions",
+    apiKey: "key",
   });
-  assert.equal(client.buildUrl(), "https://proxy.inceptionlabs.ai/v1/decisions");
+  assert.equal(client.buildUrl(), "https://custom.inceptionlabs.ai/v1/decisions");
 });
 
-test("Inception provider: normalizeModel forces mercury-decide", () => {
-  const client = new JevClient({ provider: "inception", apiKey: "test-sk" });
-  assert.equal(client.normalizeModel("foo"), "mercury-decide");
+// 5. normalizeModel always returns mercury-decide for inception
+test("5. normalizeModel always returns mercury-decide for inception", () => {
+  const client = new JevClient({ provider: "inception", apiKey: "test-key" });
   assert.equal(client.normalizeModel("jev-1.13-free"), "mercury-decide");
+  assert.equal(client.normalizeModel("foo"), "mercury-decide");
   assert.equal(client.normalizeModel(undefined), "mercury-decide");
+  assert.equal(client.normalizeModel("mercury-decide"), "mercury-decide");
 });
 
-test("Inception provider: isInception getter", () => {
-  const incClient = new JevClient({ provider: "inception", apiKey: "test-sk" });
-  assert.equal(incClient.isInception, true);
+// 6. isInception getter
+test("6. isInception getter: returns true for inception, false for opencode", () => {
+  const inceptionClient = new JevClient({ provider: "inception", apiKey: "key" });
+  assert.equal(inceptionClient.isInception, true);
 
-  const ocClient = new JevClient({ provider: "opencode" });
-  assert.equal(ocClient.isInception, false);
+  const opencodeClient = new JevClient({ provider: "opencode" });
+  assert.equal(opencodeClient.isInception, false);
 });
 
-test("Inception provider: triage sends correct request payload & auth headers", async (t) => {
-  const originalFetch = globalThis.fetch;
-  let interceptedUrl = null;
-  let interceptedMethod = null;
-  let interceptedHeaders = null;
-  let interceptedBody = null;
+// 7. triage sends correct payload (mock fetch)
+test("7. triage sends correct payload: URL, method, headers, and body", async (t) => {
+  let capturedUrl;
+  let capturedOptions;
 
   globalThis.fetch = async (url, opts) => {
-    interceptedUrl = url;
-    interceptedMethod = opts?.method;
-    interceptedHeaders = opts?.headers;
-    interceptedBody = JSON.parse(opts?.body || "{}");
+    capturedUrl = url;
+    capturedOptions = opts;
     return {
       ok: true,
       status: 200,
       json: async () => ({
         model: "mercury-decide",
-        answers: {
-          billing: { type: "noul", noul: 0.97 },
-        },
+        answers: { q1: { type: "noul", noul: 0.97 } },
         usage: { input_tokens: 48, output_tokens: 1 },
       }),
+      text: async () => "",
+      headers: { get: () => "application/json" },
     };
   };
+  t.after(restoreFetch);
 
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  const client = new JevClient({ provider: "inception", apiKey: "inception-api-key-xyz" });
-  const res = await client.triage(
-    { billing: { type: "noul", instructions: "Is this request about billing?" } },
-    { state: "User asks for a refund" }
+  const client = new JevClient({ provider: "inception", apiKey: "test-key" });
+  const result = await client.triage(
+    { q1: { type: "noul", instructions: "Is this about billing?" } },
+    { state: "test context" },
   );
 
-  assert.equal(interceptedUrl, "https://api.inceptionlabs.ai/v1/decisions");
-  assert.equal(interceptedMethod, "POST");
-  assert.equal(interceptedHeaders.authorization, "Bearer inception-api-key-xyz");
-  assert.equal(interceptedHeaders["content-type"], "application/json");
-  assert.equal(interceptedBody.model, "mercury-decide");
-  assert.equal(interceptedBody.state, "User asks for a refund");
-  assert.ok(interceptedBody.questions.billing);
-  assert.equal(res.answers.billing.noul, 0.97);
+  assert.equal(capturedUrl, "https://api.inceptionlabs.ai/v1/decisions");
+  assert.equal(capturedOptions.method, "POST");
+
+  const headers = JSON.parse(JSON.stringify(capturedOptions.headers));
+  assert.equal(headers.authorization, "Bearer test-key");
+  assert.equal(headers["content-type"], "application/json");
+
+  const body = JSON.parse(capturedOptions.body);
+  assert.deepEqual(body, {
+    model: "mercury-decide",
+    state: "test context",
+    questions: {
+      q1: { type: "noul", instructions: "Is this about billing?" },
+    },
+  });
+
+  assert.equal(result.model, "mercury-decide");
+  assert.equal(result.answers.q1.noul, 0.97);
 });
 
-test("Inception provider: triage parses choice response with confidence and probabilities", async (t) => {
-  const originalFetch = globalThis.fetch;
+// 8. triage parses noul response
+test("8. triage parses noul response: answers.billing.noul === 0.97", async (t) => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      model: "mercury-decide",
+      answers: { billing: { type: "noul", noul: 0.97 } },
+      usage: { input_tokens: 48, output_tokens: 1 },
+    }),
+    text: async () => "",
+    headers: { get: () => "application/json" },
+  });
+  t.after(restoreFetch);
+
+  const client = new JevClient({ provider: "inception", apiKey: "test-key" });
+  const res = await client.triage(
+    { billing: { type: "noul", instructions: "Is this about billing?" } },
+    { state: "test context" },
+  );
+
+  assert.equal(res.answers.billing.noul, 0.97);
+  assert.equal(res.answers.billing.type, "noul");
+});
+
+// 9. triage parses choice response
+test("9. triage parses choice response: choice and score validation", async (t) => {
   globalThis.fetch = async () => ({
     ok: true,
     status: 200,
@@ -126,23 +158,42 @@ test("Inception provider: triage parses choice response with confidence and prob
       },
       usage: { input_tokens: 64, output_tokens: 1 },
     }),
+    text: async () => "",
+    headers: { get: () => "application/json" },
   });
+  t.after(restoreFetch);
 
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  const client = new JevClient({ provider: "inception", apiKey: "key" });
-  const res = await client.triage({
-    team: {
-      type: "choice",
-      instructions: "Assign team",
-      criteria: { billing: "Payments", support: "Technical" },
+  const client = new JevClient({ provider: "inception", apiKey: "test-key" });
+  const res = await client.triage(
+    {
+      team: {
+        type: "choice",
+        instructions: "Assign team",
+        criteria: { billing: "Payments", support: "Technical" },
+      },
     },
-  });
+    { state: "User asks for refund" },
+  );
 
   assert.equal(res.answers.team.choice, "billing");
   assert.equal(res.answers.team.score, 0.95);
   assert.equal(res.answers.team.confidence, 0.95);
-  assert.equal(res.answers.team.probabilities.billing, 0.95);
+  assert.deepEqual(res.answers.team.probabilities, { billing: 0.95, support: 0.05 });
+});
+
+// 10. TOKEN_COST_PER_1K includes mercury-decide
+test("10. TOKEN_COST_PER_1K includes mercury-decide at 0.00002", () => {
+  assert.equal(TOKEN_COST_PER_1K["mercury-decide"], 0.00002);
+});
+
+// 11. getProviderConfig returns correct inception config
+test("11. getProviderConfig returns correct inception config", () => {
+  const cfg = getProviderConfig("inception", { apiKey: "sk-test" });
+  assert.equal(cfg.baseUrl, "https://api.inceptionlabs.ai/v1/decisions");
+  assert.equal(cfg.apiKey, "sk-test");
+  assert.equal(cfg.model, "mercury-decide");
+  assert.equal(cfg.provider, "inception");
+  assert.equal(cfg.id, "inception");
+  assert.equal(cfg.needsAuth, true);
+  assert.equal(cfg.endpoint, "/v1/decisions");
 });
