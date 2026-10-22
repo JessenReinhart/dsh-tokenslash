@@ -156,3 +156,30 @@ const triageResult = await tokenslash_triage({
 
 // Step 3: Parse decision -> "smart" -> dispatch subagent with smart model
 ```
+
+---
+
+## 6. Provider Alternatives: Inception Labs (Mercury Decide)
+
+In addition to TypeSafe Jev (`/v1/systemone`), `dsh-tokenslash` natively supports **Inception Labs Mercury Decide** (`https://docs.inceptionlabs.ai/capabilities/decisions`):
+
+- **Model:** `mercury-decide`
+- **Endpoint:** `POST https://api.inceptionlabs.ai/v1/decisions`
+- **Authentication:** `Authorization: Bearer $INCEPTION_API_KEY`
+- **Cost:** ~$0.02 / 1M input tokens ($0.00002 / 1K tokens), output tokens unbilled
+- **Compatibility:** Mercury Decide uses the exact same question/answer schema (`noul`, `choice`, `score`, `criteria`, `state`, `answers`), making it a 100% transparent alternative to Jev.
+
+### Configuring Inception Labs in TokenSlash:
+
+In the TokenSlash Settings UI or via `cordis.config.yml`:
+
+```yaml
+tokenslash:
+  provider: inception
+  apiKey: "your-inception-api-key"
+  model: mercury-decide
+  customBaseUrl: "https://api.inceptionlabs.ai/v1/decisions"
+```
+
+Or switch directly in the GUI using the **Provider** preset dropdown: select `Inception Labs (Mercury Decide)`.
+
