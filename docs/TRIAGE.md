@@ -118,7 +118,9 @@ You can pass plain string prompts as questions for quick heuristic checks:
 }
 ```
 
----
+The tool auto-wraps these strings into `{ "type": "noul", "instructions": "..." }` before posting, so bare prompts work even against strict endpoints like Inception Labs.***
+
+
 
 ## 4. When to Use `tokenslash_triage` vs Other Tools
 

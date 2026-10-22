@@ -1,7 +1,7 @@
 // test/inception.test.js — Inception Labs Mercury Decide provider integration tests
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { JevClient } from "../lib/jev-client.js";
+import { JevClient, normalizeQuestions } from "../lib/jev-client.js";
 import { getProviderConfig, listProviders } from "../lib/providers.js";
 import { JEV_PROVIDERS, TOKEN_COST_PER_1K } from "../lib/shared/constants.js";
 
@@ -207,5 +207,24 @@ test("12. buildUrl replaces legacy /v1/systemone with /v1/decisions for inceptio
   });
   assert.equal(client.buildUrl(), "http://127.0.0.1:20128/v1/decisions");
   assert.equal(client.buildUrl("/v1/systemone"), "http://127.0.0.1:20128/v1/decisions");
+});
+
+test("13. normalizeQuestions wraps plain string prompts into { type: 'noul', instructions }", () => {
+  // Inception Labs rejects bare string question values with HTTP 422; the client
+  // must normalize them before posting so plain prompt invocations succeed.
+  const normalized = normalizeQuestions({
+    q1: "Can we run subagents with model override?",
+    tier: {
+      type: "choice",
+      instructions: "Pick tier",
+      criteria: { cheap: "small", smart: "complex" },
+    },
+  }, true);
+  assert.deepEqual(normalized.q1, { type: "noul", instructions: "Can we run subagents with model override?" });
+  assert.deepEqual(normalized.tier, {
+    type: "choice",
+    instructions: "Pick tier",
+    criteria: { cheap: "small", smart: "complex" },
+  });
 });
 
