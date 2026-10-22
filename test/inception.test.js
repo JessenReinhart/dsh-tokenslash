@@ -197,3 +197,15 @@ test("11. getProviderConfig returns correct inception config", () => {
   assert.equal(cfg.needsAuth, true);
   assert.equal(cfg.endpoint, "/v1/decisions");
 });
+
+test("12. buildUrl replaces legacy /v1/systemone with /v1/decisions for inception provider", () => {
+  // If the user previously had a /v1/systemone customBaseUrl, inception must still target /v1/decisions
+  const client = new JevClient({
+    provider: "inception",
+    customBaseUrl: "http://127.0.0.1:20128/v1/systemone",
+    apiKey: "test-sk",
+  });
+  assert.equal(client.buildUrl(), "http://127.0.0.1:20128/v1/decisions");
+  assert.equal(client.buildUrl("/v1/systemone"), "http://127.0.0.1:20128/v1/decisions");
+});
+
