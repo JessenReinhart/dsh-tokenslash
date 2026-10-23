@@ -29,7 +29,12 @@ Over a 10-turn coding session, you burn **180,000+ tokens** just telling the LLM
 - ✂️ **Tighter Output Compaction:** Default tool-output compaction limit lowered from 10,000 → 4,000 chars (configurable via `outputCompactLimit`).
 - 🧹 **Deterministic Output Distillation:** Strips ANSI color escapes, `\r` progress-bar overwrites, npm/yarn/pnpm noise, and collapses repetitive test/warning lines *before* they hit the model — pure regex, zero LLM calls, sub-millisecond.
 - 🗂️ **Observation Masking:** Turns old tool outputs (>2 turns ago, >800 chars) into compact stubs so settled context stops draining tokens every turn, while preserving `tool_call_id` + role structure.
+- 🧠 **Jev-Guarded Selective Masking:** Before masking older tool output, TokenSlash asks Jev whether it's still actively referenced by the current task. Outputs scored relevant (`noul >= 0.6`) are kept, killing re-read thrashing in long coding sessions — and all candidates are evaluated in a **single batch request**.
+- 🎯 **Zero-Rescan `glob`/`grep` Ranking:** Overlong path or match lists are scored by keyword relevance and collapsed to a top-N summary (`topK = 10` for `glob`, `topK = 25` for `grep`) instead of dumping hundreds of raw lines.
+- 🔍 **`tokenslash_diagnose`:** Classifies test failures as flaky vs assertion vs compilation vs environment and appends a retry hint to failing `pwsh`/`bash` output; it's a core tool that survives pruning.
+- 📚 **Speculative Read Injection:** If your prompt references `lib/foo.js`, TokenSlash hints the companion `lib/foo.test.js` so the agent reads both in one batched turn instead of rescanning later.
 - 🔁 **Canonical Prefix-Cache Alignment:** Sorts surviving tool schemas and prompt sections deterministically every turn, keeping the provider's prompt prefix byte-identical for maximum cache hits and lower latency.
+- 📏 **Scalable Triage State:** `triageBatch` auto-grows its contextual state budget with question count (`max(800, questions × 350)`, capped at 4000) so mid-batch candidates aren't elided before reaching Jev.
 
 ---
 
@@ -176,6 +181,9 @@ LocalJev default triage endpoint: `http://127.0.0.1:8080/v1/systemone` with mode
   - Parameters:
     - `action`: `"inspect" | "unlock"` (required)
     - `tools`: `string[]` (list of tool names, required)
+- **`tokenslash_index`**: Structural skeleton inspection (signatures, headers, classes, exports, line ranges) ~70-90% smaller than full file reading.
+- **`tokenslash_batch`**: Dispatch up to 15 independent tool calls concurrently (`parallel`) or sequentially (`series`) in a single turn.
+- **`tokenslash_diagnose`**: Classify shell command failures (flaky vs assertion vs compilation vs environment), evaluate test failure stack traces, and suggest speculative companion reads. Protected as a core tool.
 
 ### REST Endpoints
 TokenSlash exposes local endpoints for stats and external triage:
@@ -224,7 +232,7 @@ The `/stats` endpoint returns a `byModule` breakdown (events + tokens saved per 
 npm test
 ```
 
-All 233 unit tests run via `node --test` without external dependencies or live network access.
+All 331 unit tests run via `node --test` without external dependencies or live network access.
 
 ## License
 
