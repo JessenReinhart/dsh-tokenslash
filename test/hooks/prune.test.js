@@ -292,11 +292,18 @@ test("pruneHook: leaves glob output with <= 30 paths untouched", async () => {
 test("pruneHook: ranks grep output and preserves prompt-relevant candidates first", async () => {
   const tracker = new Map([["agent-1", "find auth token in middleware"]]);
   const hook = createPruneHook({ agent: { id: "agent-1" } }, {}, () => enabledConfig, null, null, tracker);
-  const noise = Array.from({ length: 35 }, (_, i) => `src/noise/file-${i}.ts:12: match`).join("\n");
+  const noise = Array.from({ length: 60 }, (_, i) => `src/noise/file-${i}.ts:12: match`).join("\n");
   const target = `src/auth/middleware.ts:10: token = issueToken(user)`;
   const res = await hook({ name: "grep" }, `${noise}\n${target}`);
   assert.ok(res.includes(target));
-  assert.ok(res.includes("[... 26 lower-relevance paths omitted by tokenslash]"));
+  assert.ok(res.includes("[... 36 lower-relevance paths omitted by tokenslash]"));
+});
+
+test("pruneHook: leaves grep output with <= 60 matches untouched", async () => {
+  const hook = createPruneHook({}, {}, () => enabledConfig);
+  const matches = Array.from({ length: 55 }, (_, i) => `src/foo/bar.ts:${i}: result`).join("\n");
+  const res = await hook({ name: "grep" }, matches);
+  assert.equal(res, matches);
 });
 
 

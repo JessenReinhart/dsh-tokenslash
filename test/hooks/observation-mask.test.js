@@ -368,7 +368,31 @@ describe("observation-mask hook", () => {
         capturedState.includes("Refactor the authentication logic in auth.js"),
         "state should include prompt from promptTracker"
       );
-      assert.ok(capturedState.includes("Tool: read"), "state should include tool name");
+      assert.ok(capturedState.includes("read"), "state should include tool name");
+    });
+
+    test("batches multiple candidate tool results into a single Jev triage call", async () => {
+      clearTriageCache();
+      let triageCallCount = 0;
+      let questionKeys = [];
+      const mockJev = {
+        triage: async (questions) => {
+          triageCallCount++;
+          questionKeys = Object.keys(questions);
+          const answers = {};
+          for (const k of questionKeys) {
+            answers[k] = { noul: 0.8 };
+          }
+          return { answers };
+        },
+      };
+      const hook = createObservationMaskHook({}, mockJev, defaultConfig, null, null);
+      const msgs = buildConvo({ turnCount: 5, toolOutputSize: 2000 });
+      const result = await hook(msgs);
+
+      assert.equal(triageCallCount, 1, "triage should be called exactly once (single batch)");
+      assert.ok(questionKeys.length >= 2, "should batch all candidate questions in one request");
+      assert.ok(!String(result[2].content).includes("[output masked:"), "candidate should be preserved");
     });
 
     test("falls back to last user message in messages when promptTracker is absent", async () => {
