@@ -97,6 +97,44 @@ test("triageBatch respects noCache", async () => {
   assert.equal(calls, 2);
 });
 
+test("triageBatch scales state capacity with question count", async () => {
+  clearTriageCache();
+  let receivedState = "";
+  const questions = {};
+  for (let i = 0; i < 4; i++) {
+    questions[`q${i}`] = { type: "noul", instructions: `q${i}` };
+  }
+  const client = {
+    triage: async (_questions, opts) => {
+      receivedState = opts.state;
+      return { answers: {} };
+    },
+  };
+  // 4 questions -> effective max 1400 chars, so an 1100-char state survives intact
+  const state = `H${"x".repeat(1098)}T`;
+  await triageBatch(client, questions, { state, noCache: true });
+  assert.equal(receivedState, state);
+});
+
+test("triageBatch honors explicit maxStateChars", async () => {
+  clearTriageCache();
+  let receivedState = "";
+  const client = {
+    triage: async (_questions, opts) => {
+      receivedState = opts.state;
+      return { answers: {} };
+    },
+  };
+  const state = `head${"m".repeat(1200)}tail`;
+  await triageBatch(client, { q: { type: "noul" } }, {
+    state,
+    maxStateChars: 300,
+    noCache: true,
+  });
+  assert.ok(receivedState.length <= 300, "state should be clipped to explicit max");
+  assert.ok(receivedState.includes("head") && receivedState.includes("tail"));
+});
+
 test("clearTriageCache empties cache", async () => {
   clearTriageCache();
   const client = { triage: async () => ({ answers: { q: { noul: 1 } } }) };
