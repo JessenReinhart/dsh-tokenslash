@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test, describe } from "node:test";
 import { createObservationMaskHook } from "../../lib/hooks/observation-mask.js";
+import { clearTriageCache } from "../../lib/triage.js";
 
 // Helper: generate a large string of given character count
 function bigString(n) {
@@ -280,5 +281,129 @@ describe("observation-mask hook", () => {
     assert.ok(stub.includes("tokens"), "stub should mention tokens");
     assert.ok(stub.includes("grep"), "stub should mention tool name");
     assert.ok(stub.includes("result settled in prior turn"), "stub should have settled message");
+  });
+
+  describe("Jev-guarded selective observation masking", () => {
+    test("preserves older tool output when Jev returns noul >= 0.6", async () => {
+      clearTriageCache();
+      let triageCalled = false;
+      let capturedState = "";
+      const mockJev = {
+        triage: async (questions, opts) => {
+          triageCalled = true;
+          capturedState = opts?.state || "";
+          return {
+            answers: {
+              relevant: { noul: 0.85 },
+            },
+          };
+        },
+      };
+      const hook = createObservationMaskHook({}, mockJev, defaultConfig, null, null);
+      const msgs = buildConvo({ turnCount: 4, toolOutputSize: 2000 });
+      const originalContent = msgs[2].content;
+      const result = await hook(msgs);
+
+      assert.equal(triageCalled, true, "Jev triage should be called");
+      assert.equal(result[2].content, originalContent, "candidate tool output must be preserved when noul >= 0.6");
+      assert.ok(!String(result[2].content).includes("[output masked:"), "should not be masked");
+    });
+
+    test("masks older tool output when Jev returns noul < 0.6", async () => {
+      clearTriageCache();
+      let triageCalled = false;
+      const mockJev = {
+        triage: async () => {
+          triageCalled = true;
+          return {
+            answers: {
+              relevant: { noul: 0.25 },
+            },
+          };
+        },
+      };
+      const hook = createObservationMaskHook({}, mockJev, defaultConfig, null, null);
+      const msgs = buildConvo({ turnCount: 4, toolOutputSize: 2000 });
+      const result = await hook(msgs);
+
+      assert.equal(triageCalled, true, "Jev triage should be called");
+      assert.ok(
+        typeof result[2].content === "string" && result[2].content.includes("[output masked:"),
+        "tool output should be masked when noul < 0.6"
+      );
+    });
+
+    test("fails open to standard masking when Jev throws an error", async () => {
+      clearTriageCache();
+      const failingJev = {
+        triage: async () => {
+          throw new Error("Jev service unavailable");
+        },
+      };
+      const hook = createObservationMaskHook({}, failingJev, defaultConfig, null, null);
+      const msgs = buildConvo({ turnCount: 4, toolOutputSize: 2000 });
+      const result = await hook(msgs);
+
+      assert.ok(
+        typeof result[2].content === "string" && result[2].content.includes("[output masked:"),
+        "tool output should be masked when Jev fails"
+      );
+    });
+
+    test("extracts userPrompt from promptTracker when agentId is provided", async () => {
+      clearTriageCache();
+      let capturedState = "";
+      const mockJev = {
+        triage: async (questions, opts) => {
+          capturedState = opts?.state || "";
+          return { answers: { relevant: { noul: 0.9 } } };
+        },
+      };
+      const promptTracker = new Map([["agent-123", "Refactor the authentication logic in auth.js"]]);
+      const hook = createObservationMaskHook({}, mockJev, defaultConfig, null, promptTracker);
+      const msgs = buildConvo({ turnCount: 4, toolOutputSize: 2000 });
+      await hook(msgs, "agent-123");
+
+      assert.ok(
+        capturedState.includes("Refactor the authentication logic in auth.js"),
+        "state should include prompt from promptTracker"
+      );
+      assert.ok(capturedState.includes("Tool: read"), "state should include tool name");
+    });
+
+    test("falls back to last user message in messages when promptTracker is absent", async () => {
+      clearTriageCache();
+      let capturedState = "";
+      const mockJev = {
+        triage: async (questions, opts) => {
+          capturedState = opts?.state || "";
+          return { answers: { relevant: { noul: 0.7 } } };
+        },
+      };
+      const hook = createObservationMaskHook({}, mockJev, defaultConfig, null, null);
+      const msgs = buildConvo({ turnCount: 4, toolOutputSize: 2000 });
+      // In buildConvo(4), the last user message is "question 3"
+      await hook(msgs);
+
+      assert.ok(capturedState.includes("question 3"), "state should include last user message");
+    });
+
+    test("supports getter function for jevClientOrGetter", async () => {
+      clearTriageCache();
+      let called = false;
+      const mockJev = {
+        triage: async () => {
+          called = true;
+          return { answers: { relevant: { noul: 0.95 } } };
+        },
+      };
+      const hook = createObservationMaskHook({}, () => mockJev, defaultConfig);
+      const msgs = buildConvo({ turnCount: 4, toolOutputSize: 2000 });
+      const originalContent = msgs[2].content;
+      const result = await hook(msgs);
+
+      assert.equal(called, true, "Jev getter function should be called");
+      assert.equal(result[2].content, originalContent, "candidate tool output must be preserved");
+    });
   });
 });

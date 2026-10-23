@@ -35,6 +35,13 @@ test("triageHashKey is deterministic and order-independent", () => {
   assert.equal(a, b);
 });
 
+test("triageHashKey distinguishes states with identical prefix beyond 300 chars", () => {
+  const prefix = "X".repeat(350);
+  const key1 = triageHashKey({ q: { type: "noul" } }, `${prefix}_tail_1`, "model");
+  const key2 = triageHashKey({ q: { type: "noul" } }, `${prefix}_tail_2`, "model");
+  assert.notEqual(key1, key2);
+});
+
 test("triageBatch returns empty answers for no client", async () => {
   clearTriageCache();
   const res = await triageBatch(null, { q: { type: "noul" } });

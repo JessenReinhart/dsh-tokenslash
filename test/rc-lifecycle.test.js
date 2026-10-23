@@ -59,6 +59,7 @@ const EXPECTED_TOOLS = [
   "tokenslash_peek",
   "tokenslash_index",
   "tokenslash_batch",
+  "tokenslash_diagnose",
 ];
 const EXPECTED_ROUTES = 11;
 
@@ -255,7 +256,7 @@ test(`${CORDIS}: tools and bridge routes register on the real host services`, as
   assert.deepEqual(
     h.tools.registered.map((t) => t.name),
     EXPECTED_TOOLS,
-    "all four tokenslash tools registered in order",
+    "all five tokenslash tools registered in order",
   );
   for (const t of h.tools.registered) {
     assert.equal(typeof t.execute, "function", `tool ${t.name} must be executable`);

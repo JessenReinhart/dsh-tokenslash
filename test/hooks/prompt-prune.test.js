@@ -12,6 +12,8 @@ import {
   stableSortTools,
   stableSortSections,
   injectPrunedToolsNotice,
+  deriveSpeculativeReads,
+  injectSpeculativeReadsNotice,
   TOOL_GROUPS,
   CORE_TOOLS,
 } from "../../lib/hooks/prompt-prune.js";
@@ -581,5 +583,88 @@ test("TTFT: injectPrunedToolsNotice assigns order 20000 to sink volatile notice 
   const notice = out.find((s) => s.name === "tokenslash-pruned-tools");
   assert.ok(notice, "Notice section exists");
   assert.equal(notice.order, 20000, "Notice must have order 20000 to protect static prefix cache");
+});
+
+test("tokenslash-speculative-reads: prompt mentioning a source file injects companion test hint", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const config = { enabled: true, modules: { promptPruning: true } };
+  const hook = createPromptPruneHook({}, {}, () => config, telemetry);
+
+  const mockAgent = {
+    inbox: {
+      hasPending: true,
+      nextStep: [{ content: "Update lib/hooks/routing.js" }],
+    },
+  };
+
+  const assembly = {
+    tools: [{ name: "read" }, { name: "write" }],
+    sections: [{ name: "persona", text: "You are agent", order: 0 }],
+  };
+
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  const notice = res.sections.find((s) => s.name === "tokenslash-speculative-reads");
+
+  assert.ok(notice, "speculative read section should be injected");
+  assert.equal(notice.order, 20010, "speculative read section must use order 20010");
+  assert.match(notice.text, /lib\/hooks\/routing\.js/, "mentioned impl file is listed");
+  assert.match(notice.text, /test\/hooks\/routing\.test\.js/, "companion test file is listed");
+  assert.match(notice.text, /tokenslash_batch/, "hint recommends tokenslash_batch");
+});
+
+test("tokenslash-speculative-reads: no file mention means no hint section", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const config = { enabled: true, modules: { promptPruning: true } };
+  const hook = createPromptPruneHook({}, {}, () => config, telemetry);
+
+  const mockAgent = {
+    inbox: {
+      hasPending: true,
+      nextStep: [{ content: "Explain the functional programming paradigm" }],
+    },
+  };
+
+  const assembly = {
+    tools: [{ name: "read" }, { name: "write" }],
+    sections: [{ name: "persona", text: "You are agent", order: 0 }],
+  };
+
+  const res = await hook(assembly, { agent: mockAgent }, () => Promise.resolve(assembly));
+  const notice = res.sections.find((s) => s.name === "tokenslash-speculative-reads");
+
+  assert.equal(notice, undefined, "no speculative read section for pathless prompt");
+});
+
+test("deriveSpeculativeReads derives lib->test companion and bypasses docs/data files", () => {
+  assert.deepEqual(deriveSpeculativeReads("fix lib/hooks/routing.js", null), [
+    "lib/hooks/routing.js",
+    "test/hooks/routing.test.js",
+  ]);
+  assert.deepEqual(deriveSpeculativeReads("read README.md", null), []);
+  assert.deepEqual(deriveSpeculativeReads("no paths here", null), []);
+});
+
+test("deriveSpeculativeReads delegates to provided candidate corpus via planSpeculativeReads", () => {
+  const candidates = [
+    "lib/index.js",
+    "lib/hooks/routing.js",
+    "test/hooks/routing.test.js",
+  ];
+  assert.deepEqual(deriveSpeculativeReads("inspect lib/hooks/routing.js", candidates), [
+    "lib/hooks/routing.js",
+    "test/hooks/routing.test.js",
+  ]);
+});
+
+test("injectSpeculativeReadsNotice is a no-op without pairs and formats pair list", () => {
+  const sections = [{ name: "persona", text: "You are agent", order: 0 }];
+  assert.equal(injectSpeculativeReadsNotice(sections, []), sections);
+  assert.equal(injectSpeculativeReadsNotice(sections, null), sections);
+
+  const out = injectSpeculativeReadsNotice(sections, ["a.js", "a.test.js"]);
+  const notice = out.find((s) => s.name === "tokenslash-speculative-reads");
+  assert.ok(notice, "notice appended");
+  assert.equal(notice.order, 20010);
+  assert.match(notice.text, /a\.js, a\.test\.js/);
 });
 

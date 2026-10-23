@@ -202,7 +202,12 @@ test("pruneHook: short outputs (< 500 chars) bypass distillation", async () => {
 
 test("pruneHook: distillation + truncation pipeline works end-to-end", async () => {
   const telemetry = new TokenslashTelemetry();
-  const hook = createPruneHook(mockLLMCtx("compact summary"), {}, () => enabledConfig, telemetry);
+  const distillJev = {
+    triage: async () => ({
+      answers: { action: { choice: "distill" } },
+    }),
+  };
+  const hook = createPruneHook(mockLLMCtx("compact summary"), distillJev, () => enabledConfig, telemetry);
   // Large output with ANSI codes and repetition > 500 chars
   const noise = "\x1b[32m  PASS  test/suite.test.js\x1b[0m\n".repeat(200);
   const res = await hook({ name: "bash" }, noise);
@@ -219,6 +224,79 @@ test("pruneHook: distillation + truncation pipeline works end-to-end", async () 
   assert.equal(compacted[0].type, "text");
   assert.equal(compacted[0].text, "compact summary");
   assert.equal(telemetry.outputsCompactedCount, 1);
+});
+
+test("pruneHook: classifyObservation action=pass preserves oversized output verbatim", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const passJev = {
+    triage: async () => ({
+      answers: { action: { choice: "pass" } },
+    }),
+  };
+  const hook = createPruneHook(mockLLMCtx("compact summary"), passJev, () => enabledConfig, telemetry);
+  const largeDiff = "diff --git a/file b/file\n" + "+ line of critical code\n".repeat(250);
+  const res = await hook({ name: "git_diff" }, largeDiff);
+  assert.equal(res, largeDiff);
+  assert.equal(telemetry.outputsCompactedCount, 0);
+});
+
+test("pruneHook: classifyObservation action=mask returns short deterministic stub", async () => {
+  const telemetry = new TokenslashTelemetry();
+  const maskJev = {
+    triage: async () => ({
+      answers: { action: { choice: "mask" } },
+    }),
+  };
+  const hook = createPruneHook(mockLLMCtx("compact summary"), maskJev, () => enabledConfig, telemetry);
+  const largeSpam = "build progress 12%\n".repeat(300);
+  const res = await hook({ name: "build" }, largeSpam);
+  assert.ok(Array.isArray(res));
+  assert.equal(res[0].type, "text");
+  assert.ok(res[0].text.includes("output masked"));
+  assert.ok(res[0].text.includes("build"));
+});
+
+test("pruneHook: classifies shell test failure and appends diagnosis line", async () => {
+  const flakyJev = {
+    triage: async () => ({
+      answers: { failure_kind: { choice: "flaky" } },
+    }),
+  };
+  const hook = createPruneHook({}, flakyJev, () => enabledConfig);
+  const shellFailure = {
+    exitCode: 1,
+    stderr: "Error: ECONNREFUSED connect 127.0.0.1:8080\n    at TCPConnectWrap.afterConnect",
+  };
+  const res = await hook({ name: "pwsh" }, shellFailure);
+  assert.ok(res.stderr.includes("[tokenslash-diagnose: flaky - transient flake detected, safe to retry]"));
+});
+
+test("pruneHook: ranks glob output > 30 paths down to top 10 with omitted summary", async () => {
+  const hook = createPruneHook({}, {}, () => enabledConfig);
+  const paths = Array.from({ length: 40 }, (_, i) => `src/module-${String(i).padStart(2, "0")}/file-${i}.ts`);
+  const res = await hook({ name: "glob" }, paths.join("\n"));
+  const lines = res.split("\n");
+  assert.equal(lines.length, 11);
+  assert.equal(lines[0], "src/module-00/file-0.ts");
+  assert.equal(lines[9], "src/module-09/file-9.ts");
+  assert.equal(lines[10], "[... 30 lower-relevance paths omitted by tokenslash]");
+});
+
+test("pruneHook: leaves glob output with <= 30 paths untouched", async () => {
+  const hook = createPruneHook({}, {}, () => enabledConfig);
+  const paths = Array.from({ length: 30 }, (_, i) => `src/module-${i}/file.ts`).join("\n");
+  const res = await hook({ name: "glob" }, paths);
+  assert.equal(res, paths);
+});
+
+test("pruneHook: ranks grep output and preserves prompt-relevant candidates first", async () => {
+  const tracker = new Map([["agent-1", "find auth token in middleware"]]);
+  const hook = createPruneHook({ agent: { id: "agent-1" } }, {}, () => enabledConfig, null, null, tracker);
+  const noise = Array.from({ length: 35 }, (_, i) => `src/noise/file-${i}.ts:12: match`).join("\n");
+  const target = `src/auth/middleware.ts:10: token = issueToken(user)`;
+  const res = await hook({ name: "grep" }, `${noise}\n${target}`);
+  assert.ok(res.includes(target));
+  assert.ok(res.includes("[... 26 lower-relevance paths omitted by tokenslash]"));
 });
 
 
