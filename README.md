@@ -35,6 +35,8 @@ Over a 10-turn coding session, you burn **180,000+ tokens** just telling the LLM
 - 📚 **Speculative Read Injection:** If your prompt references `lib/foo.js`, TokenSlash hints the companion `lib/foo.test.js` so the agent reads both in one batched turn instead of rescanning later.
 - 🔁 **Canonical Prefix-Cache Alignment:** Sorts surviving tool schemas and prompt sections deterministically every turn, keeping the provider's prompt prefix byte-identical for maximum cache hits and lower latency.
 - 📏 **Scalable Triage State:** `triageBatch` auto-grows its contextual state budget with question count (`max(800, questions × 350)`, capped at 4000) so mid-batch candidates aren't elided before reaching Jev.
+- 🔎 **Decision Lens (v1.4.0):** New Settings UI tab that surfaces every Jev decision — type, choice/noul value, confidence, and probabilities — with live sliders for `decoupleThreshold` and `observationMaskMinChars`.
+- 🛡️ **Pre-Flight Diff Judge (v1.4.0):** Before every `edit`/`write`, Jev scores the new content for syntax soundness and scope drift; blocks destructive/corrupt changes (default `modules.diffJudge: false`, opt-in). `write` payloads get a 2400-char J window vs 800 for `edit` so large valid files aren't judged on truncated fragments.
 
 ---
 
@@ -232,7 +234,7 @@ The `/stats` endpoint returns a `byModule` breakdown (events + tokens saved per 
 npm test
 ```
 
-All 331 unit tests run via `node --test` without external dependencies or live network access.
+All 340 unit tests run via `node --test` without external dependencies or live network access.
 
 ## License
 
