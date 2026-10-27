@@ -1,7 +1,7 @@
 // test/hooks/safety.test.js
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classifyToolRisk, createSafetyHook } from "../../lib/hooks/safety.js";
+import { classifyToolRisk, createSafetyHook, judgeDiff } from "../../lib/hooks/safety.js";
 import { clearTriageCache } from "../../lib/triage.js";
 
 test("classifyToolRisk: fast-path allow for read-only allowlist tools", async () => {
@@ -249,5 +249,166 @@ test("createSafetyHook: returns kind allow when next is not provided", async () 
   };
 
   const result = await hook(exec);
+  assert.deepEqual(result, { kind: "allow" });
+});
+
+test("judgeDiff: skips non edit/write tools", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => {
+      throw new Error("Should not be called");
+    },
+  };
+  const res = await judgeDiff(mockJev, { name: "read", args: { file_path: "a.js" } }, {});
+  assert.deepEqual(res, { decision: "allow", skip: true });
+});
+
+test("judgeDiff: skips empty new content", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => {
+      throw new Error("Should not be called");
+    },
+  };
+  const res = await judgeDiff(mockJev, { name: "write", args: { content: "" } }, {});
+  assert.deepEqual(res, { decision: "allow", skip: true });
+});
+
+test("judgeDiff: fail-open when no client / missing triage", async () => {
+  clearTriageCache();
+  const res = await judgeDiff(null, { name: "edit", args: { file_path: "a.js", new_string: "x" } }, {});
+  assert.equal(res.decision, "allow");
+  assert.equal(res.reason, "no_client");
+});
+
+test("judgeDiff: blocks when syntax_sound is low (<0.35)", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => ({
+      answers: {
+        syntax_sound: { noul: 0.1 },
+        scope_drift: { noul: 0.2 },
+      },
+    }),
+  };
+  const res = await judgeDiff(
+    mockJev,
+    { name: "edit", args: { file_path: "a.js", old_string: "const a=1;", new_string: "const a=(" } },
+    {}
+  );
+  assert.equal(res.decision, "block");
+  assert.ok(res.reason.includes("syntax"));
+  assert.equal(res.syntaxScore, 0.1);
+});
+
+test("judgeDiff: blocks when scope_drift is high (>0.8)", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => ({
+      answers: {
+        syntax_sound: { noul: 0.9 },
+        scope_drift: { noul: 0.95 },
+      },
+    }),
+  };
+  const res = await judgeDiff(
+    mockJev,
+    { name: "write", args: { file_path: "a.js", content: "rm -rf /" } },
+    {}
+  );
+  assert.equal(res.decision, "block");
+  assert.ok(res.reason.includes("drift"));
+  assert.equal(res.driftScore, 0.95);
+});
+
+test("judgeDiff: allows when both scores pass", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => ({
+      answers: {
+        syntax_sound: { noul: 0.9 },
+        scope_drift: { noul: 0.1 },
+      },
+    }),
+  };
+  const res = await judgeDiff(
+    mockJev,
+    { name: "edit", args: { file_path: "a.js", old_string: "a", new_string: "b" } },
+    {}
+  );
+  assert.equal(res.decision, "allow");
+  assert.equal(res.skip, false);
+  assert.equal(res.syntaxScore, 0.9);
+  assert.equal(res.driftScore, 0.1);
+});
+
+test("judgeDiff: fails open on triage error", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => {
+      throw new Error("boom");
+    },
+  };
+  const res = await judgeDiff(mockJev, { name: "edit", args: { file_path: "a.js", new_string: "x" } }, {});
+  assert.equal(res.decision, "allow");
+});
+
+test("createSafetyHook: diffJudge enabled blocks syntax-unsound edit", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => ({
+      answers: {
+        syntax_sound: { noul: 0.05 },
+        scope_drift: { noul: 0.1 },
+      },
+    }),
+  };
+  const configGetter = () => ({
+    modules: { safetyGuard: false, diffJudge: true },
+  });
+  const hook = createSafetyHook({}, mockJev, configGetter);
+
+  const exec = {
+    name: "edit",
+    args: { file_path: "a.js", old_string: "x", new_string: "const a=(" },
+  };
+
+  let nextCalled = false;
+  const next = async () => {
+    nextCalled = true;
+    return { kind: "allow" };
+  };
+
+  const result = await hook(exec, next);
+  assert.equal(nextCalled, false);
+  assert.equal(result.kind, "cancel");
+  assert.ok(result.reason.includes("Pre-Flight Diff Judge"));
+});
+
+test("createSafetyHook: diffJudge disabled skips judging and allows", async () => {
+  clearTriageCache();
+  const mockJev = {
+    triage: async () => {
+      throw new Error("Should not be called");
+    },
+  };
+  const configGetter = () => ({
+    modules: { safetyGuard: false, diffJudge: false },
+  });
+  const hook = createSafetyHook({}, mockJev, configGetter);
+
+  const exec = {
+    name: "edit",
+    args: { file_path: "a.js", old_string: "x", new_string: "const a=(" },
+  };
+
+  let nextCalled = false;
+  const next = async () => {
+    nextCalled = true;
+    return { kind: "allow" };
+  };
+
+  const result = await hook(exec, next);
+  assert.equal(nextCalled, true);
   assert.deepEqual(result, { kind: "allow" });
 });
