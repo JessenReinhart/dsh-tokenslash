@@ -462,4 +462,15 @@ describe("tokenslash_index", () => {
   test("errors on missing file", async () => {
     await assert.rejects(() => indexFile(path.join(os.tmpdir(), "definitely-not-here-xyz.js")));
   });
+
+  test("resolves a relative path against an explicit baseDir, not process.cwd()", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "tokenslash-index-base-"));
+    const file = path.join(dir, "relative.ts");
+    await fs.writeFile(file, "export interface Cfg { a: number }\n", "utf8");
+
+    const res = await indexFile("relative.ts", null, dir);
+    assert.equal(res.path, "relative.ts");
+    assert.equal(res.language, "typescript");
+    assert.ok(res.symbols.some((s) => s.signature.includes("Cfg")), "relative file indexed from baseDir");
+  });
 });
