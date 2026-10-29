@@ -1,6 +1,6 @@
 {
   "name": "dsh-tokenslash",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "TypeSafe Jev token optimization suite for DeepSeek Harness (DSH): Subagent Router, Fork Decoupler, Tool Schema Pruner, Output Compactor, and Settings UI",
   "keywords": [
     "dsh-plugin",
