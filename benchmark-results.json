@@ -1,6 +1,6 @@
 {
   "task": "Audit the lib/ directory of this repo for security issues, error handling gaps, dead code, and async safety problems. Report specific issues with file and line references.",
-  "date": "2026-09-29T01:57:11.896Z",
+  "date": "2026-10-29T03:16:49.376Z",
   "nodeVersion": "v24.11.1",
   "jevModel": "openrouter/typesafe/jev-1.13",
   "jevEndpoint": "http://127.0.0.1:20128/v1/systemone",
@@ -39,52 +39,52 @@
       "label": "Normal mode",
       "tools": {
         "baseline": 50,
-        "kept": 12,
-        "pruned": 38
+        "kept": 50,
+        "pruned": 0
       },
       "sections": {
         "baseline": 9,
-        "kept": 1,
-        "pruned": 8
+        "kept": 9,
+        "pruned": 0
       },
       "tokens": {
         "baseline": 18036,
-        "after": 3813,
-        "saved": 14223,
-        "reductionPct": "78.9"
+        "after": 18107,
+        "saved": -72,
+        "reductionPct": "-0.4"
       },
       "chars": {
         "baseline": 72142,
-        "after": 15250,
-        "saved": 56892
+        "after": 72429,
+        "saved": -287
       },
-      "hookMs": 1013
+      "hookMs": 712
     },
     {
       "mode": "extreme",
       "label": "Extreme mode",
       "tools": {
         "baseline": 50,
-        "kept": 7,
-        "pruned": 43
+        "kept": 49,
+        "pruned": 1
       },
       "sections": {
         "baseline": 9,
-        "kept": 2,
-        "pruned": 7
+        "kept": 10,
+        "pruned": 0
       },
       "tokens": {
         "baseline": 18036,
-        "after": 3055,
-        "saved": 14981,
-        "reductionPct": "83.1"
+        "after": 18011,
+        "saved": 25,
+        "reductionPct": "0.1"
       },
       "chars": {
         "baseline": 72142,
-        "after": 12220,
-        "saved": 59922
+        "after": 72044,
+        "saved": 98
       },
-      "hookMs": 544
+      "hookMs": 14
     }
   ]
 }

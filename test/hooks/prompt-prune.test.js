@@ -440,6 +440,8 @@ test("injectToolGuidance patches read section with index/batch directives", () =
   const out = injectToolGuidance(sections);
   assert.ok(out[0].text.includes("tokenslash_index"));
   assert.ok(out[0].text.includes("tokenslash_batch"));
+  assert.ok(out[0].text.includes("under ~200 lines"));
+  assert.ok(out[0].text.includes("rather than re-reading the file you just authored"));
   assert.equal(out[1].text, "You are a coding agent.");
 });
 
