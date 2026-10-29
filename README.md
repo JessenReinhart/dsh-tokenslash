@@ -110,6 +110,40 @@ Tool Calls by Run (Workflow Efficiency)
 3. **Dev tasks converge.** For self-contained greenfield writes (runs 3–4), both workflows need `write` + `pwsh` to run tests; the gap narrows to near-parity and is dominated by whether the agent re-reads its own output.
 4. **The sweet spot is exploratory multi-file work.** `tokenslash_index` (structural skeleton, ~89% smaller than full reads) plus targeted reads avoids pulling whole files into context — the same mechanism the plugin applies to tool schemas and prompt sections.
 
+### Replication (v2 Post-Optimization)
+
+After shipping the `tokenslash-benchmark-rules` skill and the 200-line size gate in `injectToolGuidance` (commit `5893e8b`), the identical 5-task benchmark was re-run to verify whether the Run 1 regression was eliminated:
+
+```
+Chars Read into Context per Run — v2 (Size Gate Active)
+  28k ┤
+  24k ┤       ╭● Normal (27,129)
+  20k ┤       │
+  16k ┤       │
+  12k ┤ ╭●    │
+   8k ┤ │╰●───╯  TokenSlash v2 (8,740)
+   4k ┤ │  TokenSlash v2 (8,769)
+   0k ┴─●─────────────────●───────●───────●───────●─── Dev runs (0)
+       Run 1            Run 2   Run 3   Run 4   Run 5
+```
+
+| # | Task | Normal v2 | TokenSlash v2 | Δ context read |
+|---|---|---|---|---|
+| 1 | Inspect `lib/config.js` (<200 lines, size gate) | 6 calls · 6 turns · 13,800 ch | 7 calls · 3 turns · 8,769 ch | **−36%** (was +109% in v1) |
+| 2 | Trace routing + fork decoupling (2 files) | 14 calls · 1 turn · 27,129 ch | 9 calls · 3 turns · 8,740 ch | **−68%** |
+| 3 | Build LRU cache + tests (dev) | 5 calls · 2 turns · 0 ch | 4 calls · 4 turns · 0 ch | 0% (tied) |
+| 4 | Build token-budget tracker + tests (dev) | 3 calls · 2 turns · 0 ch | 5 calls · 4 turns · 0 ch | 0% (tied) |
+| 5 | Build session pruner + tests (dev) | 5 calls · 3 turns · 0 ch | 6 calls · 4 turns · 0 ch | 0% (tied) |
+
+**v2 Aggregate (5 runs):**
+
+| Metric | Normal v2 | TokenSlash v2 | Net Savings |
+|---|---|---|---|
+| Chars read into context | 40,929 | 17,509 | **−57.2%** (was −30% in v1) |
+| Est. tokens read | 10,232 | 4,377 | **−57.2%** |
+| Total tool calls | 33 | 31 | **−6.1%** |
+| Run 1 regression | +109% (15.4k ch) | **−36% (8.8k ch)** | **Regression eliminated** |
+
 ---
 
 ## How Pruning Modes Work
