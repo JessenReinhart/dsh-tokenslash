@@ -58,6 +58,60 @@ Tested on live DSH Desktop v2.0.10 with 50 registered tools and 9 system prompt 
 
 ---
 
+## 5-Run Subagent Workflow Benchmark
+
+Measured 2026-10-29 in a live DSH session (mode `normal`, BPE tokenizer, `fallbackEventCount: 0`). Five tasks of escalating complexity, each run by two subagents in parallel on the same prompt — one **normal workflow** (full reads, standard tools) and one **TokenSlash workflow** (`tokenslash_index` first, targeted `read` with `offset/limit`, batch calls). Development tasks (runs 3–5) each got a fresh directory.
+
+```
+Chars Read into Context per Run (Normal vs TokenSlash)
+  24k ┤
+  20k ┤       ╭● Normal (20,426)
+  16k ┤       │
+  12k ┤       │     ╭● TokenSlash (15,400)
+   8k ┤ ╭●───╮│  ╭──╯│
+   4k ┤ │    ╰●──╯   │   TokenSlash (7,264)
+   0k ┴─●────────────●───────●───────●───────●─── TokenSlash (0)
+       Run 1       Run 2   Run 3   Run 4   Run 5
+```
+
+```
+Tool Calls by Run (Workflow Efficiency)
+  24 ┤
+  20 ┤       ╭● Normal (22 calls)
+  16 ┤       │
+  12 ┤ ╭●────╯   TokenSlash (11)
+   8 ┤ │     ╭●──╮
+   4 ┤ ╰●────╯   ╰●──────●──────●──────● TokenSlash (4-7 calls)
+   0 ┴────────────────────────────────────────
+      Run 1    Run 2   Run 3  Run 4  Run 5
+      (Simple) (Med)   (Dev1) (Dev2) (Dev3)
+```
+| # | Task | Normal | TokenSlash | Δ context read |
+|---|---|---|---|---|
+| 1 | Inspect `lib/config.js` schema (single file) | 6 calls · 3 turns · 7,367 ch | 11 calls · 10 turns · 15,400 ch | **+109%** |
+| 2 | Trace routing + fork decoupling (2 files) | 22 calls · 17 turns · 20,426 ch | 7 calls · 4 turns · 7,264 ch | **−64%** |
+| 3 | Build LRU cache + tests (dev) | 6 calls · 4 turns · 650 ch | 6 calls · 6 turns · 700 ch | +8% |
+| 4 | Build token-budget tracker + tests (dev) | 5 calls · 3 turns · 569 ch | 4 calls · 2 turns · 673 ch | +18% |
+| 5 | Build session pruner + tests (dev) | 7 calls · 6 turns · 5,214 ch | 4 calls · 3 turns · 0 ch | **−100%** |
+
+**Aggregate (5 runs):**
+
+| Metric | Normal | TokenSlash | Δ |
+|---|---|---|---|
+| Tool calls | 46 | 32 | **−30%** |
+| Turns (execution steps) | 33 | 25 | **−24%** |
+| Chars read into context | 34,226 | 24,037 | **−30%** |
+| Est. tokens read | 8,555 | 6,009 | **−30%** |
+
+### Findings
+
+1. **TokenSlash wins as task size grows.** On the multi-file trace (run 2) it cut context read by 64% and tool calls by 68%; on the largest dev task (run 5) it wrote files directly and never re-read them (0 read chars vs 5,214).
+2. **Structural indexing has a floor.** On a trivial single-file task (run 1, 127-line `config.js`), `tokenslash_index` + targeted reads cost *more* than one plain `read`. Indexing pays off when the file is large or the task spans multiple files.
+3. **Dev tasks converge.** For self-contained greenfield writes (runs 3–4), both workflows need `write` + `pwsh` to run tests; the gap narrows to near-parity and is dominated by whether the agent re-reads its own output.
+4. **The sweet spot is exploratory multi-file work.** `tokenslash_index` (structural skeleton, ~89% smaller than full reads) plus targeted reads avoids pulling whole files into context — the same mechanism the plugin applies to tool schemas and prompt sections.
+
+---
+
 ## How Pruning Modes Work
 
 Choose the mode that fits your style in the settings:
