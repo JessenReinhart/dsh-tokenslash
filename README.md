@@ -29,10 +29,14 @@ TokenSlash runs a fast, lightweight triage model — **Mercury Decide** (`mercur
 ## Install
 
 ```bash
-node scripts/install.mjs
+dsh plugin add github:jessenreinhart/dsh-tokenslash
 ```
 
-Restart DSH Desktop, or reload the GUI after syncing to `node_modules\dsh-tokenslash`.
+Or from npm once published:
+
+```bash
+dsh plugin add dsh-tokenslash
+```
 
 ## How it works
 
