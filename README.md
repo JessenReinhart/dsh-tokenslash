@@ -2,319 +2,63 @@
 
 [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/jessenreinhart/dsh-tokenslash)
 
-> **Cut up to 85% of prompt overhead in DeepSeek Harness.**  
-> Automatically prune unused tools, strip bloated system prompts, and route subagents to budget-friendly models — without breaking agent workflows.
+> Cuts prompt overhead by pruning unused tools and prompt sections — measured live, BPE-exact, on the active Mercury Decide runtime.
 
 ---
 
-## Why TokenSlash?
+## The problem
 
-Every time you hit Enter in DeepSeek Harness (DSH), the system prompt includes **every single registered tool schema** and plugin guideline — even ones you never touch (image generators, web crawlers, workflow planners).
+Every turn, DSH injects **every registered tool schema** and plugin guideline into the system prompt. A typical desktop setup carries **50+ tools and ~18,000 tokens of static overhead** on every single turn — over a 10-turn session, that's ~180,000 tokens just describing what tools exist.
 
-In a typical desktop setup, that's **50+ tools and ~18,000 tokens of static overhead on *every single turn***.
-Over a 10-turn coding session, you burn **180,000+ tokens** just telling the LLM what tools exist.
+## The fix
 
-**TokenSlash fixes this.** It uses an ultra-fast, lightweight triage model (TypeSafe Jev) to detect what your prompt actually needs, strips the 35–43 tools you don't need, and keeps only what's required.
+TokenSlash runs a fast, lightweight triage model — **Mercury Decide** (`mercury-decide` via Inception Labs) by default, or TypeSafe Jev / OpenRouter — to detect what the prompt actually needs, strips the tools and sections that aren't required, and keeps only what matters.
 
-### Highlights
-- 📉 **Up to 85% Prompt Overhead Reduction:** Drops ~18,000 token turn baselines down to ~3,000 tokens.
-- 🛡️ **Zero Workflow Breakage:** Core file and command tools (`read`, `write`, `edit`, `pwsh`, `grep`, `glob`) are preserved in Normal mode.
-- 🧠 **Context-Aware Continuity:** "continue", "resume", or follow-up prompts automatically inherit your active tool set.
-- ⚡ **Sub-Second Triage:** Jev triage takes ~500ms over local proxy, with built-in fail-open safety (if triage fails, nothing is dropped).
-- 💰 **Subagent Model Tiering:** Automatically routes lightweight subagent tasks to cheaper models (`gemini-2.5-flash`, `deepseek-chat`).
-- 🦴 **`tokenslash_index`:** Structural skeleton tool (imports, classes, functions, line ranges `[start-end]`) across JS/TS, Python, Rust, Go, Java, HTML, Markdown, Lua, YAML, and TOML. Supports symbol filtering via `filter: "auth*"` or `/regex/` — 70–90% smaller than full `read`.
-- 📦 **`tokenslash_batch`:** Run up to 15 tool calls in a single turn. Supports concurrent `parallel` (default) or ordered `series` mode for dependent operations.
-- 👁️ **PTC Mode Aware `tokenslash_peek`:** Detects DSH Programmatic Tool Calling (`ptc`) mode and returns concise signatures instead of verbose JSON schemas.
-- 📊 **Native TokenMeter Integration:** Attaches to native DSH 0.2.x `ctx.tokenMeter` for BPE-precise token savings telemetry.
-- ✂️ **Tighter Output Compaction:** Default tool-output compaction limit lowered from 10,000 → 4,000 chars (configurable via `outputCompactLimit`).
-- 🧹 **Deterministic Output Distillation:** Strips ANSI color escapes, `\r` progress-bar overwrites, npm/yarn/pnpm noise, and collapses repetitive test/warning lines *before* they hit the model — pure regex, zero LLM calls, sub-millisecond.
-- 🗂️ **Observation Masking:** Turns old tool outputs (>2 turns ago, >800 chars) into compact stubs so settled context stops draining tokens every turn, while preserving `tool_call_id` + role structure.
-- 🧠 **Jev-Guarded Selective Masking:** Before masking older tool output, TokenSlash asks Jev whether it's still actively referenced by the current task. Outputs scored relevant (`noul >= 0.6`) are kept, killing re-read thrashing in long coding sessions — and all candidates are evaluated in a **single batch request**.
-- 🎯 **Zero-Rescan `glob`/`grep` Ranking:** Overlong path or match lists are scored by keyword relevance and collapsed to a top-N summary (`topK = 10` for `glob`, `topK = 25` for `grep`) instead of dumping hundreds of raw lines.
-- 🔍 **`tokenslash_diagnose`:** Classifies test failures as flaky vs assertion vs compilation vs environment and appends a retry hint to failing `pwsh`/`bash` output; it's a core tool that survives pruning.
-- 📚 **Speculative Read Injection:** If your prompt references `lib/foo.js`, TokenSlash hints the companion `lib/foo.test.js` so the agent reads both in one batched turn instead of rescanning later.
-- 🔁 **Canonical Prefix-Cache Alignment:** Sorts surviving tool schemas and prompt sections deterministically every turn, keeping the provider's prompt prefix byte-identical for maximum cache hits and lower latency.
-- 📏 **Scalable Triage State:** `triageBatch` auto-grows its contextual state budget with question count (`max(800, questions × 350)`, capped at 4000) so mid-batch candidates aren't elided before reaching Jev.
-- 🔎 **Decision Lens (v1.4.0):** New Settings UI tab that surfaces every Jev decision — type, choice/noul value, confidence, and probabilities — with live sliders for `decoupleThreshold` and `observationMaskMinChars`.
-- 🛡️ **Pre-Flight Diff Judge (v1.4.0):** Before every `edit`/`write`, Jev scores the new content for syntax soundness and scope drift; blocks destructive/corrupt changes (default `modules.diffJudge: false`, opt-in). `write` payloads get a 2400-char J window vs 800 for `edit` so large valid files aren't judged on truncated fragments.
+**Live results** (active DSH Desktop session, `openai/mercury-decide`, `bpe` tokenizer):
+
+| Metric | Value |
+| --- | --- |
+| Lifetime tokens saved | **1,109,410** |
+| This session saved | **736,226** (360 turns) |
+| Average per turn | **3,082 tokens** |
+| Best single turn | **4,784 tokens** (24 tools + 12 sections) |
+| API cost avoided | **$2.43** |
 
 ---
 
-## Real Benchmark Results
-
-Tested on live DSH Desktop v2.0.10 with 50 registered tools and 9 system prompt sections extracted directly from an active runtime session. Triage executed against live `openrouter/typesafe/jev-1.13` via 9Router.
-
-### 4-Turn Coding & Audit Session
-
-| Turn | Prompt | Baseline (Without TokenSlash) | With TokenSlash (Normal) | With TokenSlash (Extreme) | Tokens Saved | Reduction |
-|---|---|---|---|---|---|---|
-| **1** | *"Audit lib/ directory for issues..."* | 18,036 tokens | 3,813 tokens | 3,055 tokens | **14,223** | **78.9%** |
-| **2** | *"Read lib/index.js & jev-client.js"* | 18,036 tokens | 3,813 tokens | 2,633 tokens | **15,402** | **85.4%** |
-| **3** | *"continue"* *(inherited tool mask)* | 18,036 tokens | 3,813 tokens | 2,633 tokens | **15,402** | **85.4%** |
-| **4** | *"Summarize audit findings"* | 18,036 tokens | 3,402 tokens | 2,420 tokens | **15,616** | **86.6%** |
-| **Total** | **4 turns cumulative** | **72,144 tokens** | **14,841 tokens** | **10,741 tokens** | **61,403** | **85.1%** |
-
-*Note on measurement: Tool schemas (50,602 chars) and system prompt sections (21,540 chars) were captured verbatim from live session data. Triage calls were executed against live Jev. Token counts are computed using the standard character ratio (`chars / 4`).*
-
----
-
-## 5-Run Subagent Workflow Benchmark
-
-Measured 2026-10-29 in a live DSH session (mode `normal`, BPE tokenizer, `fallbackEventCount: 0`). Five tasks of escalating complexity, each run by two subagents in parallel on the same prompt — one **normal workflow** (full reads, standard tools) and one **TokenSlash workflow** (`tokenslash_index` first, targeted `read` with `offset/limit`, batch calls). Development tasks (runs 3–5) each got a fresh directory.
-
-```
-Chars Read into Context per Run (Normal vs TokenSlash)
-  24k ┤
-  20k ┤       ╭● Normal (20,426)
-  16k ┤       │
-  12k ┤       │     ╭● TokenSlash (15,400)
-   8k ┤ ╭●───╮│  ╭──╯│
-   4k ┤ │    ╰●──╯   │   TokenSlash (7,264)
-   0k ┴─●────────────●───────●───────●───────●─── TokenSlash (0)
-       Run 1       Run 2   Run 3   Run 4   Run 5
-```
-
-```
-Tool Calls by Run (Workflow Efficiency)
-  24 ┤
-  20 ┤       ╭● Normal (22 calls)
-  16 ┤       │
-  12 ┤ ╭●────╯   TokenSlash (11)
-   8 ┤ │     ╭●──╮
-   4 ┤ ╰●────╯   ╰●──────●──────●──────● TokenSlash (4-7 calls)
-   0 ┴────────────────────────────────────────
-      Run 1    Run 2   Run 3  Run 4  Run 5
-      (Simple) (Med)   (Dev1) (Dev2) (Dev3)
-```
-| # | Task | Normal | TokenSlash | Δ context read |
-|---|---|---|---|---|
-| 1 | Inspect `lib/config.js` schema (single file) | 6 calls · 3 turns · 7,367 ch | 11 calls · 10 turns · 15,400 ch | **+109%** |
-| 2 | Trace routing + fork decoupling (2 files) | 22 calls · 17 turns · 20,426 ch | 7 calls · 4 turns · 7,264 ch | **−64%** |
-| 3 | Build LRU cache + tests (dev) | 6 calls · 4 turns · 650 ch | 6 calls · 6 turns · 700 ch | +8% |
-| 4 | Build token-budget tracker + tests (dev) | 5 calls · 3 turns · 569 ch | 4 calls · 2 turns · 673 ch | +18% |
-| 5 | Build session pruner + tests (dev) | 7 calls · 6 turns · 5,214 ch | 4 calls · 3 turns · 0 ch | **−100%** |
-
-**Aggregate (5 runs):**
-
-| Metric | Normal | TokenSlash | Δ |
-|---|---|---|---|
-| Tool calls | 46 | 32 | **−30%** |
-| Turns (execution steps) | 33 | 25 | **−24%** |
-| Chars read into context | 34,226 | 24,037 | **−30%** |
-| Est. tokens read | 8,555 | 6,009 | **−30%** |
-
-### Findings
-
-1. **TokenSlash wins as task size grows.** On the multi-file trace (run 2) it cut context read by 64% and tool calls by 68%; on the largest dev task (run 5) it wrote files directly and never re-read them (0 read chars vs 5,214).
-2. **Structural indexing has a floor.** On a trivial single-file task (run 1, 127-line `config.js`), `tokenslash_index` + targeted reads cost *more* than one plain `read`. Indexing pays off when the file is large or the task spans multiple files.
-3. **Dev tasks converge.** For self-contained greenfield writes (runs 3–4), both workflows need `write` + `pwsh` to run tests; the gap narrows to near-parity and is dominated by whether the agent re-reads its own output.
-4. **The sweet spot is exploratory multi-file work.** `tokenslash_index` (structural skeleton, ~89% smaller than full reads) plus targeted reads avoids pulling whole files into context — the same mechanism the plugin applies to tool schemas and prompt sections.
-
-### Replication (v2 Post-Optimization)
-
-After shipping the `tokenslash-benchmark-rules` skill and the 200-line size gate in `injectToolGuidance` (commit `5893e8b`), the identical 5-task benchmark was re-run to verify whether the Run 1 regression was eliminated:
-
-```
-Chars Read into Context per Run — v2 (Size Gate Active)
-  28k ┤
-  24k ┤       ╭● Normal (27,129)
-  20k ┤       │
-  16k ┤       │
-  12k ┤ ╭●    │
-   8k ┤ │╰●───╯  TokenSlash v2 (8,740)
-   4k ┤ │  TokenSlash v2 (8,769)
-   0k ┴─●─────────────────●───────●───────●───────●─── Dev runs (0)
-       Run 1            Run 2   Run 3   Run 4   Run 5
-```
-
-| # | Task | Normal v2 | TokenSlash v2 | Δ context read |
-|---|---|---|---|---|
-| 1 | Inspect `lib/config.js` (<200 lines, size gate) | 6 calls · 6 turns · 13,800 ch | 7 calls · 3 turns · 8,769 ch | **−36%** (was +109% in v1) |
-| 2 | Trace routing + fork decoupling (2 files) | 14 calls · 1 turn · 27,129 ch | 9 calls · 3 turns · 8,740 ch | **−68%** |
-| 3 | Build LRU cache + tests (dev) | 5 calls · 2 turns · 0 ch | 4 calls · 4 turns · 0 ch | 0% (tied) |
-| 4 | Build token-budget tracker + tests (dev) | 3 calls · 2 turns · 0 ch | 5 calls · 4 turns · 0 ch | 0% (tied) |
-| 5 | Build session pruner + tests (dev) | 5 calls · 3 turns · 0 ch | 6 calls · 4 turns · 0 ch | 0% (tied) |
-
-**v2 Aggregate (5 runs):**
-
-| Metric | Normal v2 | TokenSlash v2 | Net Savings |
-|---|---|---|---|
-| Chars read into context | 40,929 | 17,509 | **−57.2%** (was −30% in v1) |
-| Est. tokens read | 10,232 | 4,377 | **−57.2%** |
-| Total tool calls | 33 | 31 | **−6.1%** |
-| Run 1 regression | +109% (15.4k ch) | **−36% (8.8k ch)** | **Regression eliminated** |
-
----
-
-## How Pruning Modes Work
-
-Choose the mode that fits your style in the settings:
-
-- **`normal` (Recommended):** Keeps core developer tools (`read`, `write`, `edit`, `glob`, `grep`, `pwsh`, `tokenslash_triage`, `todo_write`, `present`) active at all times, stripping only irrelevant specialized tools (image generation, custom workflows, scraper modules) and prompt sections. Safe, transparent, and cuts ~79% of tokens.
-- **`extreme`:** Only keeps the exact tools detected for the immediate prompt (e.g., just `read` and `edit` during code inspection). Cuts ~85% of tokens.
-- **`off`:** Disables schema and prompt pruning entirely (runs 100% vanilla DSH).
-
----
-
-## Installation
-
-### Method 1: Automated Installer (Recommended)
-
-Clone and run the installer script. It adds the dependency to your profile, pulls hoisted dependencies (like `gpt-tokenizer`), and registers the bundle in `dsh.profile.bundles`:
+## Install
 
 ```bash
-git clone https://github.com/JessenReinhart/dsh-tokenslash.git ~/.dsh/profiles/desktop/packages/dsh-tokenslash
-node ~/.dsh/profiles/desktop/packages/dsh-tokenslash/scripts/install.mjs
+node scripts/install.mjs
 ```
 
-Options:
-```bash
-node scripts/install.mjs --profile desktop        # target desktop (default)
-node scripts/install.mjs --profile web            # target another profile
-node scripts/install.mjs --dry-run                # preview changes without writing
-```
+Restart DSH Desktop, or reload the GUI after syncing to `node_modules\dsh-tokenslash`.
 
-### Method 2: From npm (once published)
+## How it works
 
-```bash
-# via the installer:
-node scripts/install.mjs --from npm
+- **Prune** — removes unused tool schemas and non-essential system-prompt sections each turn, then caches the result for that turn.
+- **Compact** — shortens redundant output.
+- **Preserve** — core tools (`read`, `write`, `edit`, `pwsh`, `grep`, `glob`) always survive pruning; "continue"/"resume" prompts inherit the prior tool set.
+- **Fail-open** — if triage errors or the provider is unreachable, nothing is dropped.
 
-# or via DSH CLI (web/acp/headless profiles):
-dsh plugin --profile web add dsh-tokenslash
-```
+## Built-in tools
 
-After installing, reload DSH Desktop (`Ctrl + R` / `F5`) or restart the app. TokenSlash will appear under **Settings → TokenSlash**.
+| Tool | Purpose |
+| --- | --- |
+| `tokenslash_index` | Structural skeleton of a file (signatures, exports, line ranges) ~70–90% smaller than a full read. |
+| `tokenslash_batch` | Run independent tool calls in parallel (`parallel`) or series (`series`). |
+| `tokenslash_peek` | `inspect` a pruned tool's schema, or `unlock` it for the current turn. |
+| `tokenslash_diagnose` | Classify command/test failures and propose next steps. |
 
----
+## Configuration
 
-## Quick Start & Configuration
+| Key | Default | Notes |
+| --- | --- | --- |
+| `provider` | `inception` | Triage provider. |
+| `model` | `openai/mercury-decide` | Swappable with TypeSafe Jev / OpenRouter. |
+| `mode` | `normal` | `normal` keeps core tools; `extreme` prunes more aggressively. |
 
-TokenSlash works out of the box with safe defaults. Customize settings under **Settings → TokenSlash** or via API:
-
-| Option | Default | What it does |
-|---|---|---|
-| `enabled` | `true` | Turn TokenSlash on or off globally |
-| `toolPruningMode` | `"normal"` | Pruning aggressiveness (`"normal"`, `"extreme"`, or `"off"`) |
-| `provider` | `"opencode"` | Triage provider (`opencode`, `9router`, `openrouter`, `typesafe`, `localjev`, `custom`) |
-| `customBaseUrl` | `http://127.0.0.1:20128/v1/systemone` | Endpoint for 9Router or custom proxy |
-| `pinnedTools` | `[]` | List of tool names you never want pruned (e.g. `["pwsh", "read"]`) |
-| `failOpen` | `true` | If triage endpoint goes down, keep all tools safe instead of failing |
-
----
-
-## Key Features Under the Hood
-
-### 1. Smart System Prompt & Tool Pruning
-Hooks into DSH's `system-prompt/assemble` lifecycle. Analyzes the incoming prompt, strips unused tool JSON schemas and non-essential documentation sections, and caches the result for the turn.
-
-When tools are pruned, TokenSlash automatically injects a Pruning Notice (`tokenslash-pruned-tools`) into the system prompt listing the pruned tools. This lets the LLM know which tools were stripped and reminds it that pruned tools can be inspected or unlocked on demand via `tokenslash_peek`.
-
-### 2. Dynamic Tool Unlocking & Inspection via `tokenslash_peek`
-TokenSlash registers `tokenslash_peek` as a core built-in tool that survives all pruning passes. If the agent discovers it needs a pruned tool mid-turn, it can invoke `tokenslash_peek` without breaking workflow:
-- **`action: "inspect"`**: Retrieve full schemas and descriptions of specified tools.
-- **`action: "unlock"`**: Mark specified tools as unlocked for the agent's turn so they bypass pruning on subsequent assembly passes.
-
-### 3. Multi-Turn Mask Inheritance
-When you say "continue", "resume", or give a brief instruction, TokenSlash detects the continuation and retains the tool mask from the prior turn so your agent never loses its active tools midway through a task.
-
-### 4. Subagent Model Tiering
-Routes subagent delegations based on task complexity. Sends simple file lookups to fast/cheap tiers (`deepseek-chat`, `gemini-2.5-flash`) while saving smart models (`deepseek-reasoner`, `claude-3-7-sonnet`) for deep architectural reasoning.
-
-### 5. Tool Output Pruning & Compaction
-When tools return massive payloads (>10KB JSON or huge diffs), TokenSlash condenses the result to essentials so history doesn't bloat your context window.
-
-### 6. Version-Aware DSH 0.2.x Compatibility
-TokenSlash detects native DSH services at plugin initialization and gracefully yields redundant hooks on modern hosts while keeping full fallback coverage on older DSH builds:
-
-| Hook | Native DSH 0.2.x Service | Behavior on 0.2.x | Behavior on 0.1.5 |
-|---|---|---|---|
-| Context Compaction | `dsh-compaction-basic` | **Yields** (avoids tool-call pairing violations) | Active |
-| Tool Result Pruner | `dsh-compaction-tool-result-pruner` | **Yields** (no double-truncation) | Active |
-| Goal Guard | `dsh-tool-goal` / `dsh-goal-round-driver` | **Yields** (host enforces round caps) | Active |
-| Subagent Routing | `dsh-tool-subagent` model selection | **Yields** (host handles provider/model) | Active |
-
-Detection is purely capability-based (`detectNativeServices(ctx)`). No version string parsing.
-
----
-
-## LocalJev Provider Setup
-
-TokenSlash supports `localjev` ([githubnext/localjev](https://github.com/githubnext/localjev)) as first-class local-only triage provider.
-
-### What is LocalJev?
-LocalJev is lightweight local server implementation of Jev triage protocol designed for low-latency, zero-cost on-device execution.
-
-### How to Run
-Install and start LocalJev with Bun, backed by local runtime like oMLX or upstream OpenAI-compatible model:
-
-```bash
-bun add -g localjev
-localjev --upstream http://127.0.0.1:8000/v1 --port 8080
-```
-
-LocalJev default triage endpoint: `http://127.0.0.1:8080/v1/systemone` with model `diffusiongemma-26B-A4B-it-4bit`.
-
-### Key Benefits
-- **0 network latency:** Triage decisions resolve locally on loopback.
-- **0 external data egress:** Prompts and tool schemas stay on device.
-- **0 cost:** Local inference burns $0 USD API budget.
-- **SOC2 compliant:** Fits strict enterprise data boundaries.
-
----
-
-## API & Tool Surface
-
-### Cordis Tools Registered
-- **`tokenslash_triage`**: Run structured micro-decisions (`noul` probability or `choice` classification) against the Jev endpoint. See [`docs/TRIAGE.md`](docs/TRIAGE.md).
-- **`tokenslash_peek`**: Dynamic inspection and unlocking tool for pruned tools.
-  - Parameters:
-    - `action`: `"inspect" | "unlock"` (required)
-    - `tools`: `string[]` (list of tool names, required)
-- **`tokenslash_index`**: Structural skeleton inspection (signatures, headers, classes, exports, line ranges) ~70-90% smaller than full file reading.
-- **`tokenslash_batch`**: Dispatch up to 15 independent tool calls concurrently (`parallel`) or sequentially (`series`) in a single turn.
-- **`tokenslash_diagnose`**: Classify shell command failures (flaky vs assertion vs compilation vs environment), evaluate test failure stack traces, and suggest speculative companion reads. Protected as a core tool.
-
-### REST Endpoints
-TokenSlash exposes local endpoints for stats and external triage:
-
-- `GET /api/dsh-tokenslash/stats` — View total tokens saved, USD saved, and prune counts.
-- `GET /api/dsh-tokenslash/history` — Inspect recent prune events and decisions.
-- `POST /api/dsh-tokenslash/config` — Update configuration dynamically.
-- `POST /api/dsh-tokenslash/triage` — Run arbitrary triage questions against the Jev engine.
-
-Live telemetry sample:
-```json
-{
-  "totalTokensSaved": 246669,
-  "estimatedCostSavedUsd": "0.54",
-  "toolsPrunedCount": 26,
-  "promptsPrunedCount": 26,
-  "observationMaskCount": 4,
-  "outputDistillCount": 12,
-  "cacheAlignmentEvents": 34,
-  "avgTokensSavedPerTurn": 9487,
-  "topPrunedTools": { "web_search": 14, "office": 12, "skill": 9 },
-  "byModule": {
-    "toolPrune": { "events": 26, "tokens": 118000 },
-    "promptPrune": { "events": 26, "tokens": 74000 },
-    "outputCompact": { "events": 5, "tokens": 18563 },
-    "observationMask": { "events": 4, "tokens": 2800 },
-    "outputDistill": { "events": 12, "tokens": 1400 },
-    "subagentDecouple": { "events": 7, "tokens": 32906 },
-    "cacheAlignment": { "events": 34, "tokens": 0 }
-  },
-  "lastPruneEvent": {
-    "toolsCount": 38,
-    "sectionsCount": 8,
-    "tokensSaved": 14223,
-    "mode": "normal"
-  }
-}
-```
-The `/stats` endpoint returns a `byModule` breakdown (events + tokens saved per feature), `topPrunedTools` (most-pruned tools), `avgTokensSavedPerTurn`, and per-feature counters so you can see exactly which optimization is saving the most.
-
----
+Local REST endpoints: `GET /api/dsh-tokenslash/stats` (savings + prune counts), `GET /api/dsh-tokenslash/history`, `POST /api/dsh-tokenslash/config`, `POST /api/dsh-tokenslash/triage`.
 
 ## Testing
 
@@ -322,7 +66,7 @@ The `/stats` endpoint returns a `byModule` breakdown (events + tokens saved per 
 npm test
 ```
 
-All 340 unit tests run via `node --test` without external dependencies or live network access.
+All 340 unit tests run via `node --test` with no external dependencies or live network access.
 
 ## License
 
