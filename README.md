@@ -1,76 +1,120 @@
-# dsh-tokenslash ⚡
+<!-- TokenSlash README -->
+<div align="center">
+  <img src="assets/tokenslash-banner.svg" alt="TokenSlash — less prompt overhead, more room for the work" width="100%" />
 
-[![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/jessenreinhart/dsh-tokenslash)
+  [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/jessenreinhart/dsh-tokenslash)
+  ![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-43853d?logo=node.js&logoColor=white)
+  ![License: MIT](https://img.shields.io/badge/License-MIT-c8f36b?labelColor=202a24&color=c8f36b)
+</div>
 
-> Cuts prompt overhead by pruning unused tools and prompt sections — measured live, BPE-exact, on the active Mercury Decide runtime.
+# TokenSlash
 
----
+**Keep the context that matters. Drop the overhead that doesn't.**
 
-## The problem
+TokenSlash is a Cordis plugin for **DeepSeek Harness (DSH)** that makes agent context more deliberate. It uses lightweight, structured decisions to select task-relevant tools and prompt sections, keep tool output manageable, and help agents route work without permanently losing access to capabilities.
 
-Every turn, DSH injects **every registered tool schema** and plugin guideline into the system prompt. A typical desktop setup carries **50+ tools and ~18,000 tokens of static overhead** on every single turn — over a 10-turn session, that's ~180,000 tokens just describing what tools exist.
+Your agent should spend its context solving the task, not rereading the descriptions of tools it will never call.
 
-## The fix
+## What it does
 
-TokenSlash runs a fast, lightweight triage model — **Mercury Decide** (`mercury-decide` via Inception Labs) by default, or TypeSafe Jev / OpenRouter — to detect what the prompt actually needs, strips the tools and sections that aren't required, and keeps only what matters.
-
-**Live results** (active DSH Desktop session, `openai/mercury-decide`, `bpe` tokenizer):
-
-| Metric | Value |
+| Capability | What you get |
 | --- | --- |
-| Lifetime tokens saved | **1,109,410** |
-| This session saved | **736,226** (360 turns) |
-| Average per turn | **3,082 tokens** |
-| Best single turn | **4,784 tokens** (24 tools + 12 sections) |
-| API cost avoided | **$2.43** |
+| **Task-aware prompt pruning** | Selects relevant tool schemas and prompt sections for the current task. |
+| **Output and observation hygiene** | Compacts oversized tool results and can mask older observations to keep context focused. |
+| **Subagent routing** | Uses structured decisions to select model tiers and decide when a fork can run with less parent context. |
+| **Tool recovery** | Lets an agent inspect a pruned tool's schema or unlock that tool for the current turn. |
+| **Workflow guardrails** | Optional goal, turn-completion, and tool-safety hooks. |
+| **Visibility** | In-chat savings telemetry, prune statistics, history, and a settings UI. |
 
----
+TokenSlash is configurable rather than one-size-fits-all. Tool pruning supports **normal**, **extreme**, and **off** modes; tools can be pinned, and individual modules can be enabled or disabled.
 
-## Install
+## Quick start
 
-```bash
-dsh plugin add github:jessenreinhart/dsh-tokenslash
-```
+Install from GitHub using the DSH plugin manager:
 
-Or from npm once published:
+    dsh plugin add github:jessenreinhart/dsh-tokenslash
 
-```bash
-dsh plugin add dsh-tokenslash
-```
+Then open the DSH settings for **TokenSlash**, choose a triage provider, and configure the model and module switches for your setup.
 
-## How it works
+- **Default preset:** 9Router Proxy
+- **Other presets:** OpenCode Zen, TypeSafe Jev, OpenRouter, Inception Labs (Mercury Decide), LocalJev, and a custom endpoint
+- **Runtime:** Node.js 20+
 
-- **Prune** — removes unused tool schemas and non-essential system-prompt sections each turn, then caches the result for that turn.
-- **Compact** — shortens redundant output.
-- **Preserve** — core tools (`read`, `write`, `edit`, `pwsh`, `grep`, `glob`) always survive pruning; "continue"/"resume" prompts inherit the prior tool set.
-- **Fail-open** — if triage errors or the provider is unreachable, nothing is dropped.
+The provider is used for narrow, structured decisions. It is not the conversational model that writes code or answers general questions.
 
-## Built-in tools
+## Built-in agent tools
 
-| Tool | Purpose |
+TokenSlash adds focused utilities that help an agent use its existing tools more efficiently.
+
+| Tool | Use it for |
 | --- | --- |
-| `tokenslash_index` | Structural skeleton of a file (signatures, exports, line ranges) ~70–90% smaller than a full read. |
-| `tokenslash_batch` | Run independent tool calls in parallel (`parallel`) or series (`series`). |
-| `tokenslash_peek` | `inspect` a pruned tool's schema, or `unlock` it for the current turn. |
-| `tokenslash_diagnose` | Classify command/test failures and propose next steps. |
+| **tokenslash_index** | Get a structural outline of a file: signatures, exports, symbols, and line ranges. Use it to locate the relevant part before requesting a larger read. |
+| **tokenslash_batch** | Run independent tool calls in parallel, or run calls sequentially when order matters. |
+| **tokenslash_peek** | Inspect the schema of a pruned tool, or unlock it so the agent can use it during the current turn. |
+| **tokenslash_diagnose** | Classify errors and test failures, suggest files to inspect, or rank candidate tests by relevance. |
+| **tokenslash_triage** | Ask the configured decision engine a narrow probability or multiple-choice question. |
+
+### A note on triage
+
+The triage engine is a **micro-decision engine**, not a chat model. Use it for decisions such as:
+
+- Is this task suitable for a cheaper subagent model?
+- Can this fork proceed without the parent's full conversation history?
+- Which tool group is relevant to this prompt?
+- Is this test failure likely to be flaky?
+
+Do not use it to write code, inspect files, search the web, or answer open-ended questions. Keep those jobs with the main agent and its normal tools.
+
+## How pruning stays reversible
+
+1. **Read the task.** TokenSlash evaluates the current prompt with the configured decision provider.
+2. **Keep the useful surface.** Relevant tool groups and prompt sections stay available; irrelevant schemas can be pruned.
+3. **Recover on demand.** The agent can call **tokenslash_peek** to inspect or unlock a tool that turns out to be needed.
+4. **Fail open.** The default configuration favors preserving normal tool access when triage is unavailable or fails.
+
+That last point matters: pruning should reduce clutter, not strand an agent halfway through a task.
 
 ## Configuration
 
-| Key | Default | Notes |
-| --- | --- | --- |
-| `provider` | `inception` | Triage provider. |
-| `model` | `openai/mercury-decide` | Swappable with TypeSafe Jev / OpenRouter. |
-| `mode` | `normal` | `normal` keeps core tools; `extreme` prunes more aggressively. |
+Most users can configure TokenSlash from the DSH settings UI. The main controls include:
 
-Local REST endpoints: `GET /api/dsh-tokenslash/stats` (savings + prune counts), `GET /api/dsh-tokenslash/history`, `POST /api/dsh-tokenslash/config`, `POST /api/dsh-tokenslash/triage`.
+| Setting | Purpose |
+| --- | --- |
+| **Provider / model** | Select a supported decision endpoint and model. |
+| **Tool pruning mode** | **normal** for conservative pruning, **extreme** for more aggressive pruning, or **off** to disable tool pruning. |
+| **Pinned tools** | Keep named tools available regardless of the pruning decision. |
+| **Fail open** | Preserve tool access when the decision provider cannot be used. |
+| **Modules** | Toggle routing, fork decoupling, prompt pruning, output compaction, observation masking, prefix-cache alignment, and guardrails. |
 
-## Testing
+See [docs/TRIAGE.md](docs/TRIAGE.md) for provider and decision-format details, and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the tested DSH/Cordis host contracts.
 
-```bash
-npm test
-```
+## Benchmarks and measurement
 
-All 340 unit tests run via `node --test` with no external dependencies or live network access.
+Token savings depend on the task, available tool set, DSH runtime, and decision provider. A pruning pass can add overhead when most tools are still relevant, so **there is no fixed savings percentage promised by this project**.
+
+The repository includes the benchmark harnesses and raw result files so you can inspect the measurements and compare them with your own workload:
+
+- [Single-turn benchmark](benchmark.mjs)
+- [Multi-turn benchmark](multi-turn-benchmark.mjs)
+- [Latest single-turn result](benchmark-results.json)
+- [Latest multi-turn result](benchmark-multiturn-results.json)
+- [Benchmark methodology and handoff notes](BENCHMARK_HANDOFF.md)
+
+## Development
+
+Requires Node.js 20 or later.
+
+    npm install
+    npm test
+
+The test command runs the project's Node.js test suite.
+
+## Project links
+
+- [Plugin listing](https://dsh-plugin.org/plugins/jessenreinhart/dsh-tokenslash)
+- [Compatibility notes](docs/COMPATIBILITY.md)
+- [Triage guide](docs/TRIAGE.md)
+- [Issue tracker](https://github.com/JessenReinhart/dsh-tokenslash/issues)
 
 ## License
 
