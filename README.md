@@ -1,6 +1,5 @@
-<!-- TokenSlash README -->
 <div align="center">
-  <img src="assets/tokenslash-banner-v2.jpg" alt="TokenSlash — less prompt overhead, more room for the work" width="100%" />
+  <img width="1672" height="941" alt="image" alt="TokenSlash — less prompt overhead, more room for the work" width="100%" src="https://github.com/user-attachments/assets/98a7d55f-e0db-4661-bfc8-2fdc67ffce02" /><!-- TokenSlash README -->
 
   [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/jessenreinhart/dsh-tokenslash)
   ![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-43853d?logo=node.js&logoColor=white)
