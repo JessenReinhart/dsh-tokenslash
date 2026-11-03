@@ -1,6 +1,6 @@
 <!-- TokenSlash README -->
 <div align="center">
-  <img src="assets/tokenslash-banner.svg" alt="TokenSlash — less prompt overhead, more room for the work" width="100%" />
+  <img src="assets/tokenslash-banner.jpg" alt="TokenSlash — less prompt overhead, more room for the work" width="100%" />
 
   [![Listed on dsh-plugin.org](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/jessenreinhart/dsh-tokenslash)
   ![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-43853d?logo=node.js&logoColor=white)
