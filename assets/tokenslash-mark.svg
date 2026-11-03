@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">TokenSlash mark</title>
+  <desc id="desc">A lime slash cuts through a stack of muted prompt-token bars.</desc>
+  <rect x="12" y="12" width="232" height="232" rx="48" fill="#101714" stroke="#34443d" stroke-width="2"/>
+  <rect x="42" y="61" width="172" height="17" rx="8.5" fill="#56645e"/>
+  <rect x="42" y="97" width="142" height="17" rx="8.5" fill="#748078"/>
+  <rect x="42" y="133" width="162" height="17" rx="8.5" fill="#56645e"/>
+  <rect x="42" y="169" width="116" height="17" rx="8.5" fill="#748078"/>
+  <rect x="42" y="205" width="150" height="17" rx="8.5" fill="#56645e"/>
+  <path d="M185 34L84 226" fill="none" stroke="#c8f36b" stroke-width="19" stroke-linecap="round"/>
+  <path d="M185 34L84 226" fill="none" stroke="#f0ffbf" stroke-opacity=".55" stroke-width="3" stroke-linecap="round"/>
+  <rect x="158" y="99" width="34" height="12" rx="6" fill="#c8f36b"/>
+  <rect x="137" y="135" width="21" height="12" rx="6" fill="#c8f36b"/>
+  <rect x="116" y="171" width="15" height="12" rx="6" fill="#c8f36b"/>
+</svg>
